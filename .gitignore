@@ -1,0 +1,47 @@
+# Generated release artifacts
+dist/
+build/
+tmp/
+work/
+*.tar.xz
+*.tar.xz.sha256
+*.tgz
+*.tar.gz
+*.tar.bz2
+*.zip
+
+# Extracted upstream source/package directories
+postgresql-*/
+mysql-*/
+valkey-*/
+
+# Local install/package staging
+prefix/
+stage/
+out/
+.cache/
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment/local config
+.env
+.env.*
+!.env.example
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor/IDE junk
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

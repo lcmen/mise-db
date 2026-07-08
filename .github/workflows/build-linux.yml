@@ -1,0 +1,77 @@
+name: Build Linux database binary
+
+on:
+    workflow_dispatch:
+        inputs:
+            tool:
+                type: choice
+                required: true
+                options:
+                    - postgres
+            version:
+                type: string
+                required: true
+
+permissions:
+    contents: write
+
+jobs:
+    build:
+        name: ${{ inputs.tool }} ${{ inputs.version }} ${{ matrix.target }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - target: linux-amd64-gnu
+                      runner: ubuntu-24.04
+                    - target: linux-arm64-gnu
+                      runner: ubuntu-24.04-arm
+        runs-on: ${{ matrix.runner }}
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Install PostgreSQL build dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends \
+                    bison \
+                    build-essential \
+                    ca-certificates \
+                    curl \
+                    flex \
+                    libicu-dev \
+                    libreadline-dev \
+                    libssl-dev \
+                    libxml2-dev \
+                    libxslt1-dev \
+                    xz-utils \
+                    zlib1g-dev
+
+            - name: Build PostgreSQL
+              run: ci/postgres.sh "${{ inputs.version }}" "${{ matrix.target }}" "$PWD/prefix"
+
+            - name: Package archive
+              run: ci/package.sh "${{ inputs.tool }}" "${{ inputs.version }}" "${{ matrix.target }}" "$PWD/prefix" "$PWD/dist"
+
+            - name: Verify archive
+              run: ci/verify.sh "${{ inputs.tool }}" "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz"
+
+            - name: Create or update release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  tag="${{ inputs.tool }}-${{ inputs.version }}"
+                  if gh release view "$tag" >/dev/null 2>&1; then
+                    gh release upload "$tag" \
+                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz" \
+                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz.sha256" \
+                      --clobber
+                  else
+                    gh release create "$tag" \
+                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz" \
+                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz.sha256" \
+                      --title "$tag" \
+                      --notes "Prebuilt ${{ inputs.tool }} ${{ inputs.version }} binaries."
+                  fi
