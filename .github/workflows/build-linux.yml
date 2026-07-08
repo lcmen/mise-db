@@ -56,7 +56,7 @@ jobs:
               run: ci/package.sh "${{ inputs.tool }}" "${{ inputs.version }}" "${{ matrix.target }}" "$PWD/prefix" "$PWD/dist"
 
             - name: Verify archive
-              run: ci/verify.sh "${{ inputs.tool }}" "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz"
+              run: ci/verify.sh "${{ inputs.tool }}" "dist/db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz"
 
             - name: Create or update release
               env:
@@ -65,13 +65,13 @@ jobs:
                   tag="${{ inputs.tool }}-${{ inputs.version }}"
                   if gh release view "$tag" >/dev/null 2>&1; then
                     gh release upload "$tag" \
-                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz" \
-                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz.sha256" \
+                      "dist/db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz" \
+                      "dist/db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz.sha256" \
                       --clobber
                   else
                     gh release create "$tag" \
-                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz" \
-                      "dist/binaries-db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz.sha256" \
+                      "dist/db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz" \
+                      "dist/db-${{ inputs.tool }}-${{ inputs.version }}-${{ matrix.target }}.tar.xz.sha256" \
                       --title "$tag" \
                       --notes "Prebuilt ${{ inputs.tool }} ${{ inputs.version }} binaries."
                   fi

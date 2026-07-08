@@ -6,10 +6,7 @@ local function fetch_releases(repo)
 
     local resp, err = http.try_get({
         url = "https://api.github.com/repos/" .. repo .. "/releases?per_page=100",
-        headers = {
-            ["Accept"] = "application/vnd.github+json",
-            ["User-Agent"] = "binaries-db-mise-plugin"
-        }
+        headers = common.github_headers()
     })
     if err ~= nil then
         error("failed to fetch GitHub releases for " .. repo .. ": " .. err)

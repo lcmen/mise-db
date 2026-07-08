@@ -32,12 +32,44 @@ local function target()
 end
 
 local function asset_name(tool, version, install_target)
-    return "binaries-db-" .. tool .. "-" .. version .. "-" .. install_target .. ".tar.xz"
+    return "db-" .. tool .. "-" .. version .. "-" .. install_target .. ".tar.xz"
 end
 
-local function download_url(repo, tool, version, install_target)
-    local asset = asset_name(tool, version, install_target)
-    return "https://github.com/" .. repo .. "/releases/download/" .. tool .. "-" .. version .. "/" .. asset
+local function fetch_release(repo, tool, version)
+    local http = require("http")
+    local json = require("json")
+    local tag = tool .. "-" .. version
+
+    local resp, err = http.try_get({
+        url = "https://api.github.com/repos/" .. repo .. "/releases/tags/" .. tag,
+        headers = common.github_headers()
+    })
+    if err ~= nil then
+        error("failed to fetch GitHub release " .. tag .. " from " .. repo .. ": " .. err)
+    end
+    if resp.status_code ~= 200 then
+        error("GitHub release request failed for " .. repo .. "@" .. tag .. ": HTTP " .. tostring(resp.status_code))
+    end
+
+    local ok, release = pcall(json.decode, resp.body)
+    if not ok then
+        error("failed to parse GitHub release " .. tag .. " from " .. repo)
+    end
+
+    return release
+end
+
+local function asset_api_url(repo, tool, version, install_target)
+    local name = asset_name(tool, version, install_target)
+    local release = fetch_release(repo, tool, version)
+
+    for _, asset in ipairs(release.assets or {}) do
+        if asset.name == name then
+            return asset.url
+        end
+    end
+
+    error("release asset not found: " .. name)
 end
 
 function PLUGIN:BackendInstall(ctx)
@@ -51,13 +83,13 @@ function PLUGIN:BackendInstall(ctx)
     local install_target = target()
     local archive = asset_name(ctx.tool, ctx.version, install_target)
     local archive_path = file.join_path(ctx.download_path, archive)
-    local url = download_url(common.github_repository, ctx.tool, ctx.version, install_target)
+    local url = asset_api_url(common.github_repository, ctx.tool, ctx.version, install_target)
 
     cmd.exec("mkdir -p " .. common.shell_quote(ctx.download_path) .. " " .. common.shell_quote(ctx.install_path))
 
     local ok, err = http.try_download_file({
         url = url,
-        headers = {["User-Agent"] = "binaries-db-mise-plugin"}
+        headers = common.github_headers("application/octet-stream")
     }, archive_path)
     if err ~= nil then
         error("failed to download " .. url .. ": " .. err)

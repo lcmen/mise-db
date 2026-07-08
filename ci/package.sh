@@ -31,7 +31,7 @@ done
 
 mkdir -p "$prefix/lib" "$prefix/share" "$prefix/licenses/postgres" "$dist_dir"
 
-archive="binaries-db-$tool-$version-$target.tar.xz"
+archive="db-$tool-$version-$target.tar.xz"
 tar -C "$prefix" -cf - . | xz -c > "$dist_dir/$archive"
 if command -v sha256sum >/dev/null 2>&1; then
   (cd "$dist_dir" && sha256sum "$archive" > "$archive.sha256")
