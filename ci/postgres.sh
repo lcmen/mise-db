@@ -1,45 +1,27 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ci/utils.sh
+. "$script_dir/utils.sh"
+
 usage() {
-  echo "usage: $0 <version> <target> <prefix>" >&2
+  cat >&2 <<EOF
+usage:
+  VERSION=<version> TARGET=<target> $0 build
+  VERSION=<version> TARGET=<target> $0 package
+  VERSION=<version> TARGET=<target> $0 verify
+  VERSION=<version> TARGET=<target> $0 release
+EOF
 }
 
-if [ "$#" -ne 3 ]; then
-  usage
-  exit 2
-fi
-
-version="$1"
-target="$2"
-prefix="$3"
-
-case "$target" in
-  linux-amd64-gnu|linux-arm64-gnu|darwin-amd64|darwin-arm64) ;;
-  *) echo "unsupported target: $target" >&2; exit 1 ;;
-esac
-
-jobs() {
-  job_count=""
-  if command -v nproc >/dev/null 2>&1; then
-    job_count="$(nproc)"
-  elif command -v sysctl >/dev/null 2>&1; then
-    job_count="$(sysctl -n hw.ncpu 2>/dev/null || true)"
-  fi
-
-  if [ -z "$job_count" ]; then
-    job_count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
-  fi
-
-  if [ -z "$job_count" ]; then
-    job_count=2
-  fi
-
-  echo "$job_count"
+archive_path() {
+  echo "$PWD/dist/$(archive_name postgres "$VERSION" "$TARGET")"
 }
 
 configure_env() {
-  case "$target" in
+  case "$TARGET" in
     darwin-*)
       if ! command -v brew >/dev/null 2>&1; then
         echo "Homebrew is required for Darwin builds" >&2
@@ -63,27 +45,107 @@ configure_env() {
   esac
 }
 
-work_dir="${WORK_DIR:-$PWD/work/postgres-$version-$target}"
-source_url="https://ftp.postgresql.org/pub/source/v${version}/postgresql-${version}.tar.bz2"
-archive="$work_dir/postgresql-${version}.tar.bz2"
-src_dir="$work_dir/postgresql-${version}"
+build_postgres() {
+  read_env
 
-rm -rf "$work_dir" "$prefix"
-mkdir -p "$work_dir" "$prefix"
+  src="$PWD/src"
+  source_url="https://ftp.postgresql.org/pub/source/v${VERSION}/postgresql-${VERSION}.tar.bz2"
 
-curl -fSL "$source_url" -o "$archive"
-tar -xf "$archive" -C "$work_dir"
+  rm -rf "$src" "$PREFIX"
+  mkdir -p "$src" "$PREFIX"
 
-cd "$src_dir"
-configure_env
-./configure \
-  --prefix="$prefix" \
-  --with-openssl \
-  --with-icu \
-  --with-libxml \
-  --with-libxslt
-make -j"$(jobs)"
-make install
+  source_archive="$(download_archive "$source_url" "$src")"
+  extract_archive "$source_archive" "$src" 1
 
-mkdir -p "$prefix/licenses/postgres"
-cp COPYRIGHT "$prefix/licenses/postgres/COPYRIGHT"
+  cd "$src"
+  configure_env
+  ./configure \
+    --prefix="$PREFIX" \
+    --with-openssl \
+    --with-icu \
+    --with-libxml \
+    --with-libxslt
+  make -j"$(cpu_count)"
+  make install
+
+  mkdir -p "$PREFIX/licenses/postgres"
+  cp COPYRIGHT "$PREFIX/licenses/postgres/COPYRIGHT"
+}
+
+package_postgres() {
+  read_env
+  archive="$(archive_path)"
+
+  required_bins='postgres pg_ctl initdb psql createdb dropdb createuser dropuser'
+  for bin in $required_bins; do
+    if [ ! -x "$PREFIX/bin/$bin" ]; then
+      echo "missing executable: bin/$bin" >&2
+      exit 1
+    fi
+  done
+
+  archive_dir="$(dirname "$archive")"
+  mkdir -p "$PREFIX/lib" "$PREFIX/share" "$PREFIX/licenses/postgres" "$archive_dir"
+
+  archive_basename="$(basename "$archive")"
+  tar -C "$PREFIX" -cf - . | xz -c > "$archive"
+  (cd "$(dirname "$archive")" && sha256 "$archive_basename")
+
+  echo "$archive"
+}
+
+verify_postgres() {
+  read_env
+  archive="$(archive_path)"
+
+  if [ ! -f "$archive" ]; then
+    echo "archive not found: $archive" >&2
+    exit 1
+  fi
+
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "$tmp_dir"' EXIT
+
+  tar -xf "$archive" -C "$tmp_dir"
+
+  "$tmp_dir/bin/postgres" --version
+  "$tmp_dir/bin/psql" --version
+  "$tmp_dir/bin/initdb" --version
+}
+
+release_postgres() {
+  read_env
+  archive="$(archive_path)"
+
+  if [ ! -f "$archive" ]; then
+    echo "archive not found: $archive" >&2
+    exit 1
+  fi
+
+  if [ ! -f "$archive.sha256" ]; then
+    echo "checksum not found: $archive.sha256" >&2
+    exit 1
+  fi
+
+  release_upload postgres "$VERSION" "$archive"
+}
+
+if [ "$#" -lt 1 ]; then
+  usage
+  exit 2
+fi
+
+command="$1"
+shift
+if [ "$#" -ne 0 ]; then
+  usage
+  exit 2
+fi
+
+case "$command" in
+  build) build_postgres ;;
+  package) package_postgres ;;
+  verify) verify_postgres ;;
+  release) release_postgres ;;
+  *) usage; exit 2 ;;
+esac

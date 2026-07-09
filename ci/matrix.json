@@ -1,0 +1,12 @@
+{
+  "tool": [
+    {
+      "tool": "postgres",
+      "version": "18.4"
+    },
+    {
+      "tool": "postgres",
+      "version": "18.3"
+    }
+  ]
+}

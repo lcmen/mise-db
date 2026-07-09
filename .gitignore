@@ -2,7 +2,7 @@
 dist/
 build/
 tmp/
-work/
+src/
 *.tar.xz
 *.tar.xz.sha256
 *.tgz

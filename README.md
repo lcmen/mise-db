@@ -111,32 +111,12 @@ postgres 18 -> latest available 18.x
 
 The plugin publishes and installs exact upstream versions only. It does not publish fake major-only versions such as `18`.
 
-## Private Repository Testing
-
-While the repository is private, export a GitHub token before listing or installing:
-
-```bash
-export GH_TOKEN="$(gh auth token)"
-```
-
-The token needs read access to `lcmen/mise-db` releases.
-
 ## Manual GitHub Actions Builds
 
-Use the `Build Linux database binary` or `Build Darwin database binary` workflow from the GitHub Actions tab.
+Use the `Build database binaries` workflow from the GitHub Actions tab.
 
-Run the workflow manually with:
+The workflow reads tool/version pairs from `ci/matrix.json` and builds each pair for every supported target.
 
-- `tool`: `postgres`
-- `version`: exact upstream PostgreSQL 18.x version, for example `18.4`
+Existing complete release assets are skipped during normal matrix builds.
 
-The workflows build PostgreSQL from source for the supported Linux or macOS targets, package `.tar.xz` archives, generate `.sha256` files, verify them, and upload them to the matching GitHub Release.
-
-## Local Packaging Verification
-
-After a local build has created a prefix directory:
-
-```bash
-ci/package.sh postgres 18.4 linux-amd64-gnu "$PWD/prefix" "$PWD/dist"
-ci/verify.sh postgres "$PWD/dist/db-postgres-18.4-linux-amd64-gnu.tar.xz"
-```
+Use the `Rebuild database binary` workflow to force rebuild and re-upload one tool/version across every supported target.

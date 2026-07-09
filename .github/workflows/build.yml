@@ -1,0 +1,99 @@
+name: Build database binaries
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  matrix:
+    name: Read build matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      tools: ${{ steps.matrix.outputs.tools }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Read matrix
+        id: matrix
+        run: |
+          echo "tools=$(jq -c .tool ci/matrix.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.tool.tool }} ${{ matrix.tool.version }} ${{ matrix.target.name }}
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: ${{ fromJSON(needs.matrix.outputs.tools) }}
+        target:
+          - name: linux-amd64-gnu
+            runner: ubuntu-24.04
+            os: linux
+          - name: linux-arm64-gnu
+            runner: ubuntu-24.04-arm
+            os: linux
+          - name: darwin-amd64
+            runner: macos-15-intel
+            os: darwin
+          - name: darwin-arm64
+            runner: macos-15
+            os: darwin
+
+    runs-on: ${{ matrix.target.runner }}
+    env:
+      TOOL: ${{ matrix.tool.tool }}
+      VERSION: ${{ matrix.tool.version }}
+      TARGET: ${{ matrix.target.name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check existing release assets
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${TOOL}-${VERSION}"
+          archive="db-${TOOL}-${VERSION}-${TARGET}.tar.xz"
+          checksum="${archive}.sha256"
+
+          if gh release view "$tag" --json assets --jq '.assets[].name' > assets.txt 2>/dev/null; then
+            if grep -Fx "$archive" assets.txt >/dev/null && grep -Fx "$checksum" assets.txt >/dev/null; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "$archive and $checksum already exist in $tag"
+            else
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Linux build dependencies
+        if: steps.existing.outputs.exists != 'true' && matrix.target.os == 'linux'
+        run: ci/linux.sh setup
+
+      - name: Install Darwin build dependencies
+        if: steps.existing.outputs.exists != 'true' && matrix.target.os == 'darwin'
+        run: ci/darwin.sh setup
+
+      - name: Build
+        if: steps.existing.outputs.exists != 'true'
+        run: "ci/${TOOL}.sh build"
+
+      - name: Package
+        if: steps.existing.outputs.exists != 'true'
+        run: "ci/${TOOL}.sh package"
+
+      - name: Verify
+        if: steps.existing.outputs.exists != 'true'
+        run: "ci/${TOOL}.sh verify"
+
+      - name: Create or update release
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: "ci/${TOOL}.sh release"

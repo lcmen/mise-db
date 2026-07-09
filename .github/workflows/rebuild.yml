@@ -1,0 +1,70 @@
+name: Rebuild database binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: Tool to rebuild, for example postgres.
+        required: true
+        type: choice
+        options:
+          - postgres
+      version:
+        description: Version to rebuild, for example 18.4.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    name: ${{ inputs.tool }} ${{ inputs.version }} ${{ matrix.target.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: linux-amd64-gnu
+            runner: ubuntu-24.04
+            os: linux
+          - name: linux-arm64-gnu
+            runner: ubuntu-24.04-arm
+            os: linux
+          - name: darwin-amd64
+            runner: macos-15-intel
+            os: darwin
+          - name: darwin-arm64
+            runner: macos-15
+            os: darwin
+
+    runs-on: ${{ matrix.target.runner }}
+    env:
+      TOOL: ${{ inputs.tool }}
+      VERSION: ${{ inputs.version }}
+      TARGET: ${{ matrix.target.name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: matrix.target.os == 'linux'
+        run: ci/linux.sh setup
+
+      - name: Install Darwin build dependencies
+        if: matrix.target.os == 'darwin'
+        run: ci/darwin.sh setup
+
+      - name: Build
+        run: "ci/${TOOL}.sh build"
+
+      - name: Package
+        run: "ci/${TOOL}.sh package"
+
+      - name: Verify
+        run: "ci/${TOOL}.sh verify"
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: "ci/${TOOL}.sh release"
