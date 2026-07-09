@@ -199,13 +199,15 @@ hooks/
   backend_install.lua
   backend_exec_env.lua
 ci/
+  darwin.sh
+  linux.sh
+  matrix.json
   postgres.sh
-  package.sh
-  verify.sh
+  utils.sh
 .github/
   workflows/
-    build-linux.yml
-    build-darwin.yml
+    build.yml
+    rebuild.yml
 README.md
 AGENTS.md
 ```
@@ -271,14 +273,24 @@ GitHub Actions should build or repackage database binaries and publish them as G
 
 ### PostgreSQL
 
-Compile from source in CI:
+Compile from source in CI through `ci/postgres.sh build`. The script uses:
 
 ```bash
-curl -fSL "https://ftp.postgresql.org/pub/source/v${version}/postgresql-${version}.tar.bz2" -o "postgresql-${version}.tar.bz2"
-tar -xf "postgresql-${version}.tar.bz2"
-cd "postgresql-${version}"
-./configure --prefix="$prefix" --with-openssl --with-icu --with-libxml --with-libxslt
-make -j"$(nproc)"
+VERSION=18.4 TARGET=linux-amd64-gnu ci/postgres.sh build
+```
+
+Internally it downloads PostgreSQL source, extracts it into `src/`, installs into `prefix/`, then packaging writes:
+
+```text
+dist/db-postgres-<version>-<target>.tar.xz
+dist/db-postgres-<version>-<target>.tar.xz.sha256
+```
+
+PostgreSQL configure options:
+
+```bash
+./configure --prefix="$PREFIX" --with-openssl --with-icu --with-libxml --with-libxslt
+make -j"$(cpu_count)"
 make install
 ```
 
@@ -303,30 +315,51 @@ permissions:
   contents: write
 ```
 
-The workflows should:
+The normal workflow is:
+
+```text
+.github/workflows/build.yml
+```
+
+It reads tool/version pairs from:
+
+```text
+ci/matrix.json
+```
+
+and builds each pair for every supported target. Existing complete release assets are skipped when both the archive and `.sha256` already exist.
+
+The force rebuild workflow is:
+
+```text
+.github/workflows/rebuild.yml
+```
+
+It accepts `tool` and `version` inputs and rebuilds/re-uploads that pair for every supported target.
+
+Both workflows should:
 
 1. Check out the repo.
-2. Install build dependencies.
-3. Build or repackage the selected tool/version.
+2. Install platform dependencies through `ci/linux.sh setup` or `ci/darwin.sh setup`.
+3. Build or repackage the selected tool/version through `ci/<tool>.sh build`.
 4. Package the result into `dist/db-<tool>-<version>-<target>.tar.xz`.
 5. Generate a `.sha256` file.
-6. Verify the archive by extracting it and running version commands.
-7. Create or update the GitHub Release `<tool>-<version>`.
-8. Upload the archive and checksum with `--clobber`.
+6. Verify the archive through `ci/<tool>.sh verify`.
+7. Create or update the GitHub Release `<tool>-<version>` and upload assets with `--clobber`.
 
 ---
 
 ## Verification
 
-`ci/verify.sh` should extract a generated archive into a temporary directory and run version commands.
+`ci/<tool>.sh verify` should extract a generated archive into a temporary directory and run version commands.
 
 PostgreSQL verification:
 
 ```bash
-bin/postgres --version
-bin/psql --version
-bin/initdb --version
+VERSION=18.4 TARGET=linux-amd64-gnu ci/postgres.sh verify
 ```
+
+That command runs `bin/postgres --version`, `bin/psql --version`, and `bin/initdb --version`.
 
 Verification should not start persistent services or require privileged access.
 

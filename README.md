@@ -2,7 +2,7 @@
 
 `mise-db` is a [mise](https://mise.jdx.dev/) backend plugin repository. The plugin is installed as `db` and installs prebuilt database binaries.
 
-Phase 1 supports PostgreSQL 18.x on glibc Linux and macOS. The repository is structured so MySQL and Redis-compatible binaries can be added later without changing the release asset naming scheme.
+`mise-db` currently supports PostgreSQL on glibc Linux and macOS. The repository is structured so MySQL and Redis-compatible binaries can be added later without changing the release asset naming scheme.
 
 This plugin provides binaries only. It does not manage services, data directories, ports, users, passwords, initialization, migrations, or process supervision.
 
@@ -38,14 +38,14 @@ Exact versions are also supported:
 
 - `postgres` - PostgreSQL server and client binaries
 
-Planned tools after phase 1:
+Planned tools:
 
 - `mysql` - MySQL Community Server / client binaries
 - `redis` - Redis-compatible server and CLI binaries
 
 ## Supported Platforms
 
-Phase 1 supports:
+Supported targets:
 
 - `linux-amd64-gnu`
 - `linux-arm64-gnu`
@@ -115,8 +115,24 @@ The plugin publishes and installs exact upstream versions only. It does not publ
 
 Use the `Build database binaries` workflow from the GitHub Actions tab.
 
-The workflow reads tool/version pairs from `ci/matrix.json` and builds each pair for every supported target.
-
-Existing complete release assets are skipped during normal matrix builds.
+The workflow reads tool/version pairs from `ci/matrix.json` and builds each pair for every supported target. Existing complete release assets are skipped.
 
 Use the `Rebuild database binary` workflow to force rebuild and re-upload one tool/version across every supported target.
+
+Local package verification:
+
+```bash
+export VERSION=18.4
+export TARGET=linux-amd64-gnu
+
+ci/postgres.sh package
+ci/postgres.sh verify
+```
+
+## Available Versions
+
+| Tool | Versions |
+| --- | --- |
+| `postgres` | `18.3`, `18.4` |
+| `mysql` | Not supported yet |
+| `redis` | Not supported yet |

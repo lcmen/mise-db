@@ -1,4 +1,4 @@
-name: Rebuild database binary
+name: Rebuild a specific tool
 
 on:
   workflow_dispatch:

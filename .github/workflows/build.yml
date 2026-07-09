@@ -1,4 +1,4 @@
-name: Build database binaries
+name: Build all tools
 
 on:
   workflow_dispatch:
