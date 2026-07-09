@@ -7,7 +7,7 @@ usage() {
 }
 
 setup() {
-  brew update
+  brew update && brew upgrade
   brew install \
     bison \
     flex \

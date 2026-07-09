@@ -7,8 +7,8 @@ usage() {
 }
 
 setup() {
-  sudo apt-get update
-  sudo apt-get install -y --no-install-recommends \
+  sudo apt update && sudo apt upgrade
+  sudo apt install -y --no-install-recommends \
     bison \
     build-essential \
     ca-certificates \
