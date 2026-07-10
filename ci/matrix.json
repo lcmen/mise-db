@@ -7,6 +7,34 @@
     {
       "tool": "postgres",
       "version": "18.3"
+    },
+    {
+      "tool": "postgres",
+      "version": "18.2"
+    },
+    {
+      "tool": "postgres",
+      "version": "17.10"
+    },
+    {
+      "tool": "postgres",
+      "version": "17.9"
+    },
+    {
+      "tool": "postgres",
+      "version": "17.8"
+    },
+    {
+      "tool": "postgres",
+      "version": "16.14"
+    },
+    {
+      "tool": "postgres",
+      "version": "16.13"
+    },
+    {
+      "tool": "postgres",
+      "version": "16.12"
     }
   ]
 }
