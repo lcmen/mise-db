@@ -39,6 +39,38 @@
     {
       "tool": "valkey",
       "version": "9.1.0"
+    },
+    {
+      "tool": "valkey",
+      "version": "9.0.4"
+    },
+    {
+      "tool": "valkey",
+      "version": "9.0.3"
+    },
+    {
+      "tool": "valkey",
+      "version": "8.1.8"
+    },
+    {
+      "tool": "valkey",
+      "version": "8.1.7"
+    },
+    {
+      "tool": "valkey",
+      "version": "8.1.6"
+    },
+    {
+      "tool": "valkey",
+      "version": "7.2.13"
+    },
+    {
+      "tool": "valkey",
+      "version": "7.2.12"
+    },
+    {
+      "tool": "valkey",
+      "version": "7.2.11"
     }
   ]
 }
