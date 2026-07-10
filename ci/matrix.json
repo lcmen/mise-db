@@ -35,6 +35,10 @@
     {
       "tool": "postgres",
       "version": "16.12"
+    },
+    {
+      "tool": "valkey",
+      "version": "9.1.0"
     }
   ]
 }

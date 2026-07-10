@@ -29,10 +29,10 @@ jobs:
       matrix:
         tool: ${{ fromJSON(needs.matrix.outputs.tools) }}
         target:
-          - name: linux-amd64-gnu
+          - name: linux-amd64
             runner: ubuntu-24.04
             os: linux
-          - name: linux-arm64-gnu
+          - name: linux-arm64
             runner: ubuntu-24.04-arm
             os: linux
           - name: darwin-amd64

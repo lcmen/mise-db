@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - postgres
+          - valkey
       version:
         description: Version to rebuild, for example 18.4.
         required: true
@@ -24,10 +25,10 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - name: linux-amd64-gnu
+          - name: linux-amd64
             runner: ubuntu-24.04
             os: linux
-          - name: linux-arm64-gnu
+          - name: linux-arm64
             runner: ubuntu-24.04-arm
             os: linux
           - name: darwin-amd64

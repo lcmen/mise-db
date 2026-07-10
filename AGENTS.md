@@ -28,10 +28,10 @@ Then use it in `mise.toml`:
 [tools]
 "db:postgres" = "18"
 "db:mysql" = "8.4"
-"db:redis" = "8"
+"db:valkey" = "9"
 ```
 
-Phase 1 only implements PostgreSQL 18.x. MySQL and Redis-compatible binaries are planned later.
+Phase 1 implements PostgreSQL and Valkey. MySQL binaries are planned later.
 
 Do **not** commit generated database binaries into git. Database binaries must be stored as GitHub Release assets.
 
@@ -44,7 +44,7 @@ Partial versions must resolve to the latest matching concrete upstream version:
 ```text
 postgres 18 -> latest available 18.x, for example 18.4
 mysql 8.4   -> latest available 8.4.x
-redis 8     -> latest available 8.x
+valkey 9    -> latest available 9.x
 ```
 
 The plugin must publish and install exact upstream versions. Do not publish fake major-only versions such as `18` or `8`.
@@ -54,7 +54,7 @@ Good available versions:
 ```text
 postgres: 16.14, 17.10, 18.4
 mysql:    8.4.10, 9.4.0
-redis:    8.0.3, 8.1.3
+valkey:   9.1.0
 ```
 
 Bad available versions:
@@ -62,7 +62,7 @@ Bad available versions:
 ```text
 postgres: 16, 17, 18
 mysql:    8, 9
-redis:    8
+valkey:   9
 ```
 
 ---
@@ -74,13 +74,14 @@ Use these exact tool names:
 ```text
 postgres
 mysql
-redis
+valkey
 ```
 
-Phase 1 validates and supports only:
+Phase 1 validates and supports:
 
 ```text
 postgres
+valkey
 ```
 
 ---
@@ -90,8 +91,8 @@ postgres
 Phase 1 required targets:
 
 ```text
-linux-amd64-gnu
-linux-arm64-gnu
+linux-amd64
+linux-arm64
 darwin-amd64
 darwin-arm64
 ```
@@ -112,12 +113,12 @@ db-<tool>-<version>-<target>.tar.xz.sha256
 Examples:
 
 ```text
-db-postgres-18.4-linux-amd64-gnu.tar.xz
-db-postgres-18.4-linux-arm64-gnu.tar.xz
+db-postgres-18.4-linux-amd64.tar.xz
+db-postgres-18.4-linux-arm64.tar.xz
 db-postgres-18.4-darwin-amd64.tar.xz
 db-postgres-18.4-darwin-arm64.tar.xz
-db-mysql-8.4.10-linux-amd64-gnu.tar.xz
-db-redis-8.1.3-linux-arm64-gnu.tar.xz
+db-mysql-8.4.10-linux-amd64.tar.xz
+db-valkey-9.1.0-linux-arm64.tar.xz
 ```
 
 GitHub Release tags should use:
@@ -131,7 +132,7 @@ Examples:
 ```text
 postgres-18.4
 mysql-8.4.10
-redis-8.1.3
+valkey-9.1.0
 ```
 
 Direct public URL shape:
@@ -177,7 +178,14 @@ bin/mysqladmin
 bin/mysqldump
 ```
 
-Redis-compatible archive should include at least:
+Valkey archive should include at least:
+
+```text
+bin/valkey-server
+bin/valkey-cli
+```
+
+For drop-in Redis compatibility, Valkey archives should also include:
 
 ```text
 bin/redis-server
@@ -226,7 +234,7 @@ Use the `db:<tool>` form:
 [tools]
 "db:postgres" = "18"
 "db:mysql" = "8.4"
-"db:redis" = "8"
+"db:valkey" = "9"
 ```
 
 The plugin should implement at least these hooks:
@@ -250,7 +258,7 @@ BackendExecEnv
 
 - Validate tool name.
 - Detect OS and architecture.
-- Support glibc Linux and macOS targets listed above.
+- Support Ubuntu-compatible Linux and macOS targets listed above.
 - Find the matching release asset named `db-<tool>-<version>-<target>.tar.xz`.
 - Download the `.tar.xz` archive.
 - Extract the archive into `ctx.install_path`.
@@ -260,7 +268,6 @@ BackendExecEnv
 ### `BackendExecEnv`
 
 - Add `<install_path>/bin` to `PATH`.
-- Add useful home variables where applicable, such as `POSTGRES_HOME`.
 - Do not start services automatically.
 
 This plugin provides binaries only. It does not manage data directories, ports, service supervision, initialization, users, passwords, or migrations.
@@ -276,7 +283,7 @@ GitHub Actions should build or repackage database binaries and publish them as G
 Compile from source in CI through `ci/postgres.sh build`. The script uses:
 
 ```bash
-VERSION=18.4 TARGET=linux-amd64-gnu ci/postgres.sh build
+VERSION=18.4 TARGET=linux-amd64 ci/postgres.sh build
 ```
 
 Internally it downloads PostgreSQL source, extracts it into `src/`, installs into `prefix/`, then packaging writes:
@@ -298,9 +305,9 @@ make install
 
 For v0.1, prefer repackaging official MySQL Community generic archives instead of compiling MySQL from source.
 
-### Redis-Compatible Binaries
+### Valkey
 
-Future Redis-compatible binaries may be built from a compatible upstream source. Keep the public tool name `redis`.
+Build Valkey from source in CI through `ci/valkey.sh build`. Keep the public tool name `valkey`, and include Redis-compatible command names (`redis-server` and `redis-cli`) in the archive for drop-in compatibility.
 
 ---
 
@@ -356,7 +363,7 @@ Both workflows should:
 PostgreSQL verification:
 
 ```bash
-VERSION=18.4 TARGET=linux-amd64-gnu ci/postgres.sh verify
+VERSION=18.4 TARGET=linux-amd64 ci/postgres.sh verify
 ```
 
 That command runs `bin/postgres --version`, `bin/psql --version`, and `bin/initdb --version`.
@@ -401,7 +408,7 @@ Manual builds are enough for v0.1. If implementing discovery later:
 
 - Discover latest supported PostgreSQL versions from official PostgreSQL release/source listings.
 - Discover latest MySQL Community versions from official MySQL downloads/release metadata where practical.
-- Discover latest Redis-compatible versions from upstream release metadata.
+- Discover latest Valkey versions from upstream release metadata.
 - Keep only the latest 4 relevant release lines per tool.
 - Do not trigger builds for assets that already exist in GitHub Releases.
 
@@ -427,9 +434,9 @@ The repository root license should only describe the license for the `db` plugin
 
 ## Portability Notes
 
-Linux v0.1 targets are glibc-based Linux.
+Linux v0.1 targets are built and verified on GitHub-hosted Ubuntu runners.
 
-Be explicit in docs that v0.1 supports glibc Linux, not musl/Alpine.
+Be explicit in docs that v0.1 supports Ubuntu-compatible Linux and macOS. Other Linux distributions may work if compatible runtime libraries are available, but are not guaranteed. Alpine/musl is not supported.
 
 Prefer bundling required shared libraries when practical, but do not overcomplicate v0.1. At minimum, verify the generated archive on the GitHub runner where it was built.
 

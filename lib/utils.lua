@@ -1,6 +1,7 @@
 local M = {}
 
 M.github_repository = "lcmen/mise-db"
+M.supported_tools = {"postgres", "valkey"}
 
 -- Builds GitHub request headers, adding auth when a token is available.
 function M.github_headers(accept)
@@ -18,11 +19,15 @@ function M.github_headers(accept)
     return headers
 end
 
--- Ensures only tools implemented by the current phase are accepted.
+-- Ensures only implemented tools are accepted.
 function M.validate_tool(tool)
-    if tool ~= "postgres" then
-        error("unsupported tool '" .. tostring(tool) .. "'; phase 1 supports only postgres")
+    for _, supported_tool in ipairs(M.supported_tools) do
+        if tool == supported_tool then
+            return
+        end
     end
+
+    error("unsupported tool '" .. tostring(tool) .. "'; supported tools: " .. table.concat(M.supported_tools, ", "))
 end
 
 -- Quotes a value for use as one POSIX shell argument.
