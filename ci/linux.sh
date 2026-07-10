@@ -7,7 +7,7 @@ usage() {
 }
 
 setup() {
-  sudo apt update && sudo apt upgrade
+  sudo apt update
   sudo apt install -y --no-install-recommends \
     bison \
     build-essential \
