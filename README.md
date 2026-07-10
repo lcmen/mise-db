@@ -2,7 +2,7 @@
 
 `mise-db` is a [mise](https://mise.jdx.dev/) backend plugin repository. The plugin is installed as `db` and installs prebuilt database binaries.
 
-`mise-db` currently supports PostgreSQL on glibc Linux and macOS. The repository is structured so MySQL and Redis-compatible binaries can be added later without changing the release asset naming scheme.
+`mise-db` currently supports PostgreSQL and Valkey on Ubuntu-compatible Linux and macOS. The repository is structured so MySQL can be added later without changing the release asset naming scheme.
 
 This plugin provides binaries only. It does not manage services, data directories, ports, users, passwords, initialization, migrations, or process supervision.
 
@@ -25,6 +25,7 @@ Partial versions resolve to the latest matching concrete upstream version publis
 ```toml
 [tools]
 "db:postgres" = "18"
+"db:valkey" = "9"
 ```
 
 Exact versions are also supported:
@@ -32,27 +33,28 @@ Exact versions are also supported:
 ```toml
 [tools]
 "db:postgres" = "18.4"
+"db:valkey" = "9.1.0"
 ```
 
 ## Supported Tools
 
 - `postgres` - PostgreSQL server and client binaries
+- `valkey` - Valkey server and CLI binaries, including Redis-compatible `redis-server` and `redis-cli` names
 
 Planned tools:
 
 - `mysql` - MySQL Community Server / client binaries
-- `redis` - Redis-compatible server and CLI binaries
 
 ## Supported Platforms
 
 Supported targets:
 
-- `linux-amd64-gnu`
-- `linux-arm64-gnu`
+- `linux-amd64`
+- `linux-arm64`
 - `darwin-amd64`
 - `darwin-arm64`
 
-musl/Alpine, Windows, MySQL, and Redis-compatible binaries are not supported yet.
+Linux binaries are built and verified on GitHub-hosted Ubuntu runners. Other Linux distributions may work if compatible runtime libraries are available, but are not guaranteed. Windows, Alpine/musl, and MySQL binaries are not supported yet.
 
 ## GitHub Release Assets
 
@@ -68,6 +70,7 @@ Example:
 
 ```text
 postgres-18.4
+valkey-9.1.0
 ```
 
 Assets use:
@@ -80,10 +83,11 @@ db-<tool>-<version>-<target>.tar.xz.sha256
 Examples:
 
 ```text
-db-postgres-18.4-linux-amd64-gnu.tar.xz
-db-postgres-18.4-linux-arm64-gnu.tar.xz
+db-postgres-18.4-linux-amd64.tar.xz
+db-postgres-18.4-linux-arm64.tar.xz
 db-postgres-18.4-darwin-amd64.tar.xz
 db-postgres-18.4-darwin-arm64.tar.xz
+db-valkey-9.1.0-linux-amd64.tar.xz
 ```
 
 Archives extract directly into the mise install directory and contain:
@@ -97,16 +101,17 @@ licenses/
 
 ## Version Resolution
 
-The plugin lists concrete PostgreSQL 18.x versions from GitHub Releases by reading tags named:
+The plugin lists concrete versions from GitHub Releases by reading tags named:
 
 ```text
-postgres-18.x
+<tool>-<version>
 ```
 
 Partial versions resolve to the latest matching concrete version. For example:
 
 ```text
 postgres 18 -> latest available 18.x
+valkey 9    -> latest available 9.x
 ```
 
 The plugin publishes and installs exact upstream versions only. It does not publish fake major-only versions such as `18`.
@@ -123,16 +128,26 @@ Local package verification:
 
 ```bash
 export VERSION=18.4
-export TARGET=linux-amd64-gnu
+export TARGET=linux-amd64
 
 ci/postgres.sh package
 ci/postgres.sh verify
+```
+
+Valkey verification checks both native Valkey command names and Redis-compatible command names:
+
+```bash
+export VERSION=9.1.0
+export TARGET=linux-amd64
+
+ci/valkey.sh package
+ci/valkey.sh verify
 ```
 
 ## Available Versions
 
 | Tool | Versions |
 | --- | --- |
-| `postgres` | `18.3`, `18.4` |
+| `postgres` | `16.12`, `16.13`, `16.14`, `17.8`, `17.9`, `17.10`, `18.2`, `18.3`, `18.4` |
 | `mysql` | Not supported yet |
-| `redis` | Not supported yet |
+| `valkey` | `9.1.0` |

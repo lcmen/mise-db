@@ -19,6 +19,7 @@ setup() {
     libssl-dev \
     libxml2-dev \
     libxslt1-dev \
+    pkg-config \
     xz-utils \
     zlib1g-dev
 }

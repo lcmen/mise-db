@@ -30,7 +30,10 @@ function PLUGIN:BackendListVersions(ctx)
 
     for _, release in ipairs(fetch_releases(common.github_repository)) do
         if not release.prerelease then
-            local version = release.tag_name and release.tag_name:match("^postgres%-(18%.%d+)$")
+            local version = release.tag_name and release.tag_name:match("^" .. ctx.tool .. "%-(%d+%.%d+%.%d+)$")
+            if not version then
+                version = release.tag_name and release.tag_name:match("^" .. ctx.tool .. "%-(%d+%.%d+)$")
+            end
             if version then
                 table.insert(versions, version)
             end

@@ -116,7 +116,7 @@ validate_target() {
   target="$1"
 
   case "$target" in
-    linux-amd64-gnu|linux-arm64-gnu|darwin-amd64|darwin-arm64) ;;
+    linux-amd64|linux-arm64|darwin-amd64|darwin-arm64) ;;
     *) echo "unsupported target: $target" >&2; exit 1 ;;
   esac
 }

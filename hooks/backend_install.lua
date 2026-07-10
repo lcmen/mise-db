@@ -17,18 +17,18 @@ local function target()
 
     if os_type == "linux" then
         if env_type ~= "gnu" then
-            error("unsupported Linux libc: " .. tostring(env_type) .. "; phase 1 supports glibc Linux only")
+            error("unsupported Linux environment: " .. tostring(env_type) .. "; supported Linux builds are Ubuntu-compatible")
         end
         if arch_type == "amd64" then
-            return "linux-amd64-gnu"
+            return "linux-amd64"
         end
         if arch_type == "arm64" then
-            return "linux-arm64-gnu"
+            return "linux-arm64"
         end
         error("unsupported Linux architecture: " .. tostring(arch_type) .. "; supported: amd64, arm64")
     end
 
-    error("unsupported platform: " .. tostring(os_type) .. "; supported: glibc Linux and macOS")
+    error("unsupported platform: " .. tostring(os_type) .. "; supported: Ubuntu-compatible Linux and macOS")
 end
 
 local function asset_name(tool, version, install_target)
