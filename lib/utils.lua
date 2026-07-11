@@ -1,7 +1,7 @@
 local M = {}
 
 M.github_repository = "lcmen/mise-db"
-M.supported_tools = {"postgres", "valkey"}
+M.supported_tools = {"postgres", "mysql", "valkey"}
 
 -- Builds GitHub request headers, adding auth when a token is available.
 function M.github_headers(accept)

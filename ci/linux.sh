@@ -14,7 +14,9 @@ setup() {
     ca-certificates \
     curl \
     flex \
+    libaio1t64 \
     libicu-dev \
+    libnuma1 \
     libreadline-dev \
     libssl-dev \
     libxml2-dev \

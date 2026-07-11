@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - postgres
+          - mysql
           - valkey
       version:
         description: Version to rebuild, for example 18.4.

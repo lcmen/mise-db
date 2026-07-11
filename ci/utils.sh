@@ -6,7 +6,7 @@ archive_name() {
   version="$2"
   target="$3"
 
-  echo "db-$tool-$version-$target.tar.xz"
+  echo "$tool-$version-$target.tar.xz"
 }
 
 # Prints the available CPU count.

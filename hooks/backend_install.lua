@@ -32,7 +32,7 @@ local function target()
 end
 
 local function asset_name(tool, version, install_target)
-    return "db-" .. tool .. "-" .. version .. "-" .. install_target .. ".tar.xz"
+    return tool .. "-" .. version .. "-" .. install_target .. ".tar.xz"
 end
 
 local function fetch_release(repo, tool, version)

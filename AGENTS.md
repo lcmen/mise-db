@@ -31,7 +31,7 @@ Then use it in `mise.toml`:
 "db:valkey" = "9"
 ```
 
-Phase 1 implements PostgreSQL and Valkey. MySQL binaries are planned later.
+Phase 1 implements PostgreSQL, MySQL, and Valkey.
 
 Do **not** commit generated database binaries into git. Database binaries must be stored as GitHub Release assets.
 
@@ -81,6 +81,7 @@ Phase 1 validates and supports:
 
 ```text
 postgres
+mysql
 valkey
 ```
 
@@ -106,19 +107,19 @@ Do not implement musl/Alpine or Windows in v0.1.
 Database binaries must be uploaded to GitHub Releases using this naming scheme:
 
 ```text
-db-<tool>-<version>-<target>.tar.xz
-db-<tool>-<version>-<target>.tar.xz.sha256
+<tool>-<version>-<target>.tar.xz
+<tool>-<version>-<target>.tar.xz.sha256
 ```
 
 Examples:
 
 ```text
-db-postgres-18.4-linux-amd64.tar.xz
-db-postgres-18.4-linux-arm64.tar.xz
-db-postgres-18.4-darwin-amd64.tar.xz
-db-postgres-18.4-darwin-arm64.tar.xz
-db-mysql-8.4.10-linux-amd64.tar.xz
-db-valkey-9.1.0-linux-arm64.tar.xz
+postgres-18.4-linux-amd64.tar.xz
+postgres-18.4-linux-arm64.tar.xz
+postgres-18.4-darwin-amd64.tar.xz
+postgres-18.4-darwin-arm64.tar.xz
+mysql-8.4.10-linux-amd64.tar.xz
+valkey-9.1.0-linux-arm64.tar.xz
 ```
 
 GitHub Release tags should use:
@@ -138,7 +139,7 @@ valkey-9.1.0
 Direct public URL shape:
 
 ```text
-https://github.com/lcmen/mise-db/releases/download/<tool>-<version>/db-<tool>-<version>-<target>.tar.xz
+https://github.com/lcmen/mise-db/releases/download/<tool>-<version>/<tool>-<version>-<target>.tar.xz
 ```
 
 While the repository is private, the plugin may download release assets through the GitHub Releases API with `GH_TOKEN`.
@@ -259,7 +260,7 @@ BackendExecEnv
 - Validate tool name.
 - Detect OS and architecture.
 - Support Ubuntu-compatible Linux and macOS targets listed above.
-- Find the matching release asset named `db-<tool>-<version>-<target>.tar.xz`.
+- Find the matching release asset named `<tool>-<version>-<target>.tar.xz`.
 - Download the `.tar.xz` archive.
 - Extract the archive into `ctx.install_path`.
 - Ensure installed binaries are executable.
@@ -289,8 +290,8 @@ VERSION=18.4 TARGET=linux-amd64 ci/postgres.sh build
 Internally it downloads PostgreSQL source, extracts it into `src/`, installs into `prefix/`, then packaging writes:
 
 ```text
-dist/db-postgres-<version>-<target>.tar.xz
-dist/db-postgres-<version>-<target>.tar.xz.sha256
+dist/postgres-<version>-<target>.tar.xz
+dist/postgres-<version>-<target>.tar.xz.sha256
 ```
 
 PostgreSQL configure options:
@@ -349,7 +350,7 @@ Both workflows should:
 1. Check out the repo.
 2. Install platform dependencies through `ci/linux.sh setup` or `ci/darwin.sh setup`.
 3. Build or repackage the selected tool/version through `ci/<tool>.sh build`.
-4. Package the result into `dist/db-<tool>-<version>-<target>.tar.xz`.
+4. Package the result into `dist/<tool>-<version>-<target>.tar.xz`.
 5. Generate a `.sha256` file.
 6. Verify the archive through `ci/<tool>.sh verify`.
 7. Create or update the GitHub Release `<tool>-<version>` and upload assets with `--clobber`.
