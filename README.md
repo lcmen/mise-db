@@ -2,7 +2,7 @@
 
 `mise-db` is a [mise](https://mise.jdx.dev/) backend plugin repository. The plugin is installed as `db` and installs prebuilt database binaries.
 
-`mise-db` currently supports PostgreSQL and Valkey on Ubuntu-compatible Linux and macOS. The repository is structured so MySQL can be added later without changing the release asset naming scheme.
+`mise-db` currently supports PostgreSQL, MySQL, and Valkey on Ubuntu-compatible Linux and macOS.
 
 This plugin provides binaries only. It does not manage services, data directories, ports, users, passwords, initialization, migrations, or process supervision.
 
@@ -25,6 +25,7 @@ Partial versions resolve to the latest matching concrete upstream version publis
 ```toml
 [tools]
 "db:postgres" = "18"
+"db:mysql" = "9"
 "db:valkey" = "9"
 ```
 
@@ -33,17 +34,15 @@ Exact versions are also supported:
 ```toml
 [tools]
 "db:postgres" = "18.4"
+"db:mysql" = "9.7.1"
 "db:valkey" = "9.1.0"
 ```
 
 ## Supported Tools
 
 - `postgres` - PostgreSQL server and client binaries
+- `mysql` - MySQL Community Server and client binaries
 - `valkey` - Valkey server and CLI binaries, including Redis-compatible `redis-server` and `redis-cli` names
-
-Planned tools:
-
-- `mysql` - MySQL Community Server / client binaries
 
 ## Supported Platforms
 
@@ -54,7 +53,7 @@ Supported targets:
 - `darwin-amd64`
 - `darwin-arm64`
 
-Linux binaries are built and verified on GitHub-hosted Ubuntu runners. Other Linux distributions may work if compatible runtime libraries are available, but are not guaranteed. Windows, Alpine/musl, and MySQL binaries are not supported yet.
+Linux binaries are built and verified on GitHub-hosted Ubuntu runners. Other Linux distributions may work if compatible runtime libraries are available, but are not guaranteed. Windows and Alpine/musl are not supported yet.
 
 ## GitHub Release Assets
 
@@ -70,24 +69,26 @@ Example:
 
 ```text
 postgres-18.4
+mysql-9.7.1
 valkey-9.1.0
 ```
 
 Assets use:
 
 ```text
-db-<tool>-<version>-<target>.tar.xz
-db-<tool>-<version>-<target>.tar.xz.sha256
+<tool>-<version>-<target>.tar.xz
+<tool>-<version>-<target>.tar.xz.sha256
 ```
 
 Examples:
 
 ```text
-db-postgres-18.4-linux-amd64.tar.xz
-db-postgres-18.4-linux-arm64.tar.xz
-db-postgres-18.4-darwin-amd64.tar.xz
-db-postgres-18.4-darwin-arm64.tar.xz
-db-valkey-9.1.0-linux-amd64.tar.xz
+postgres-18.4-linux-amd64.tar.xz
+postgres-18.4-linux-arm64.tar.xz
+postgres-18.4-darwin-amd64.tar.xz
+postgres-18.4-darwin-arm64.tar.xz
+mysql-9.7.1-linux-amd64.tar.xz
+valkey-9.1.0-linux-amd64.tar.xz
 ```
 
 Archives extract directly into the mise install directory and contain:
@@ -111,6 +112,7 @@ Partial versions resolve to the latest matching concrete version. For example:
 
 ```text
 postgres 18 -> latest available 18.x
+mysql 9    -> latest available 9.x
 valkey 9    -> latest available 9.x
 ```
 
@@ -144,10 +146,21 @@ ci/valkey.sh package
 ci/valkey.sh verify
 ```
 
+MySQL is repackaged from official MySQL Community generic archives:
+
+```bash
+export VERSION=9.7.1
+export TARGET=linux-amd64
+
+ci/mysql.sh build
+ci/mysql.sh package
+ci/mysql.sh verify
+```
+
 ## Available Versions
 
 | Tool | Versions |
 | --- | --- |
-| `postgres` | `16.12`, `16.13`, `16.14`, `17.8`, `17.9`, `17.10`, `18.2`, `18.3`, `18.4` |
-| `mysql` | Not supported yet |
-| `valkey` | `7.2.11`, `7.2.12`, `7.2.13`, `8.1.6`, `8.1.7`, `8.1.8`, `9.0.3`, `9.0.4`, `9.1.0` |
+| `postgres` | `16.14`, `17.10`, `18.4` |
+| `mysql` | `8.0.46`, `8.4.9`, `9.7.1` |
+| `valkey` | `7.2.13`, `8.1.8`, `9.1.0` |

@@ -6,35 +6,23 @@
     },
     {
       "tool": "postgres",
-      "version": "18.3"
-    },
-    {
-      "tool": "postgres",
-      "version": "18.2"
-    },
-    {
-      "tool": "postgres",
       "version": "17.10"
-    },
-    {
-      "tool": "postgres",
-      "version": "17.9"
-    },
-    {
-      "tool": "postgres",
-      "version": "17.8"
     },
     {
       "tool": "postgres",
       "version": "16.14"
     },
     {
-      "tool": "postgres",
-      "version": "16.13"
+      "tool": "mysql",
+      "version": "9.7.1"
     },
     {
-      "tool": "postgres",
-      "version": "16.12"
+      "tool": "mysql",
+      "version": "8.4.9"
+    },
+    {
+      "tool": "mysql",
+      "version": "8.0.46"
     },
     {
       "tool": "valkey",
@@ -42,35 +30,11 @@
     },
     {
       "tool": "valkey",
-      "version": "9.0.4"
-    },
-    {
-      "tool": "valkey",
-      "version": "9.0.3"
-    },
-    {
-      "tool": "valkey",
       "version": "8.1.8"
     },
     {
       "tool": "valkey",
-      "version": "8.1.7"
-    },
-    {
-      "tool": "valkey",
-      "version": "8.1.6"
-    },
-    {
-      "tool": "valkey",
       "version": "7.2.13"
-    },
-    {
-      "tool": "valkey",
-      "version": "7.2.12"
-    },
-    {
-      "tool": "valkey",
-      "version": "7.2.11"
     }
   ]
 }

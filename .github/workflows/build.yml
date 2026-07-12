@@ -58,7 +58,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${TOOL}-${VERSION}"
-          archive="db-${TOOL}-${VERSION}-${TARGET}.tar.xz"
+          archive="${TOOL}-${VERSION}-${TARGET}.tar.xz"
           checksum="${archive}.sha256"
 
           if gh release view "$tag" --json assets --jq '.assets[].name' > assets.txt 2>/dev/null; then
