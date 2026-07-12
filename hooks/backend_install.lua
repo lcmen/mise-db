@@ -1,5 +1,63 @@
 local common = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
 
+local function read_os_release()
+    local values = {}
+    local handle = io.open("/etc/os-release", "r")
+    if handle == nil then
+        error("unsupported Linux distribution: /etc/os-release was not found")
+    end
+
+    for line in handle:lines() do
+        local key, value = line:match("^([A-Z0-9_]+)=(.*)$")
+        if key and value then
+            value = value:gsub('^"', ""):gsub('"$', "")
+            values[key] = value
+        end
+    end
+    handle:close()
+
+    return values
+end
+
+local function linux_target(arch_type, env_type)
+    if env_type ~= "gnu" then
+        error("unsupported Linux libc: " .. tostring(env_type) .. "; supported Linux builds require glibc")
+    end
+    if arch_type ~= "amd64" and arch_type ~= "arm64" then
+        error("unsupported Linux architecture: " .. tostring(arch_type) .. "; supported Linux architectures: amd64, arm64")
+    end
+
+    local os_release = read_os_release()
+    local id = os_release.ID or ""
+    local version_id = os_release.VERSION_ID or ""
+
+    if id == "ubuntu" then
+        if version_id == "24.04" then
+            return "ubuntu24-" .. arch_type
+        end
+        if version_id == "26.04" then
+            return "ubuntu26-" .. arch_type
+        end
+        error("Ubuntu " .. (version_id ~= "" and version_id or "unknown") .. " is not supported. Supported Ubuntu releases are 24.04 and 26.04.")
+    end
+
+    if id == "fedora" then
+        if version_id == "43" then
+            return "fedora43-" .. arch_type
+        end
+        if version_id == "44" then
+            return "fedora44-" .. arch_type
+        end
+        error("Fedora " .. (version_id ~= "" and version_id or "unknown") .. " is not supported. Supported Fedora releases are 43 and 44.")
+    end
+
+    if id == "arch" or (os_release.ID_LIKE or ""):match("arch") then
+        error("Arch Linux is not supported in v0.1 because it is a rolling release.")
+    end
+
+    error("unsupported Linux distribution: " .. (os_release.PRETTY_NAME or id or "unknown") .. "; supported: Ubuntu 24.04, Ubuntu 26.04, Fedora 43, Fedora 44")
+end
+
 local function target()
     local os_type = RUNTIME and RUNTIME.osType
     local arch_type = RUNTIME and RUNTIME.archType
@@ -16,19 +74,10 @@ local function target()
     end
 
     if os_type == "linux" then
-        if env_type ~= "gnu" then
-            error("unsupported Linux libc: " .. tostring(env_type) .. "; Linux builds require glibc and are built and verified on Ubuntu")
-        end
-        if arch_type == "amd64" then
-            return "linux-amd64"
-        end
-        if arch_type == "arm64" then
-            return "linux-arm64"
-        end
-        error("unsupported Linux architecture: " .. tostring(arch_type) .. "; supported: amd64, arm64")
+        return linux_target(arch_type, env_type)
     end
 
-    error("unsupported platform: " .. tostring(os_type) .. "; supported: glibc Linux built and verified on Ubuntu, and macOS")
+    error("unsupported platform: " .. tostring(os_type) .. "; supported: Ubuntu 24.04, Ubuntu 26.04, Fedora 43, Fedora 44, and macOS")
 end
 
 local function asset_name(tool, version, install_target)

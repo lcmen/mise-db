@@ -2,7 +2,7 @@
 
 `mise-db` is a [mise](https://mise.jdx.dev/) backend plugin repository. The plugin is installed as `db` and installs prebuilt database binaries.
 
-`mise-db` currently supports PostgreSQL, MySQL, and Valkey on Ubuntu-compatible Linux and macOS.
+`mise-db` currently supports PostgreSQL, MySQL, and Valkey on distro-specific Linux targets and macOS.
 
 This plugin provides binaries only. It does not manage services, data directories, ports, users, passwords, initialization, migrations, or process supervision.
 
@@ -46,14 +46,20 @@ Exact versions are also supported:
 
 ## Supported Platforms
 
-Supported targets:
+Supported platforms:
 
-- `linux-amd64`
-- `linux-arm64`
-- `darwin-amd64`
-- `darwin-arm64`
+- Ubuntu 24.04 LTS x86_64 (`ubuntu24-amd64`)
+- Ubuntu 24.04 LTS arm64 (`ubuntu24-arm64`)
+- Ubuntu 26.04 LTS x86_64 (`ubuntu26-amd64`)
+- Ubuntu 26.04 LTS arm64 (`ubuntu26-arm64`)
+- Fedora 43 x86_64 (`fedora43-amd64`)
+- Fedora 43 arm64 (`fedora43-arm64`)
+- Fedora 44 x86_64 (`fedora44-amd64`)
+- Fedora 44 arm64 (`fedora44-arm64`)
+- macOS x86_64 (`darwin-amd64`)
+- macOS arm64 (`darwin-arm64`)
 
-Linux binaries are built and verified on GitHub-hosted Ubuntu runners. Other Linux distributions may work if compatible runtime libraries are available, but are not guaranteed. Windows and Alpine/musl are not supported yet.
+Linux binaries are built and verified for the specific distro release named in the asset. Other Linux distributions are unsupported in v0.1. Arch Linux is intentionally excluded because it is a rolling release, and Ubuntu interim releases such as 25.x are unsupported unless dedicated artifacts are added. Windows and Alpine/musl are not supported yet.
 
 ## GitHub Release Assets
 
@@ -83,12 +89,20 @@ Assets use:
 Examples:
 
 ```text
-postgres-18.4-linux-amd64.tar.xz
-postgres-18.4-linux-arm64.tar.xz
+postgres-18.4-ubuntu24-amd64.tar.xz
+postgres-18.4-ubuntu24-arm64.tar.xz
+postgres-18.4-ubuntu26-amd64.tar.xz
+postgres-18.4-ubuntu26-arm64.tar.xz
+postgres-18.4-fedora43-amd64.tar.xz
+postgres-18.4-fedora43-arm64.tar.xz
+postgres-18.4-fedora44-amd64.tar.xz
+postgres-18.4-fedora44-arm64.tar.xz
 postgres-18.4-darwin-amd64.tar.xz
 postgres-18.4-darwin-arm64.tar.xz
-mysql-9.7.1-linux-amd64.tar.xz
-valkey-9.1.0-linux-amd64.tar.xz
+mysql-9.7.1-ubuntu24-amd64.tar.xz
+mysql-9.7.1-ubuntu24-arm64.tar.xz
+valkey-9.1.0-fedora44-amd64.tar.xz
+valkey-9.1.0-fedora44-arm64.tar.xz
 ```
 
 Archives extract directly into the mise install directory and contain:
@@ -122,7 +136,7 @@ The plugin publishes and installs exact upstream versions only. It does not publ
 
 Use the `Build database binaries` workflow from the GitHub Actions tab.
 
-The workflow reads tool/version pairs from `ci/matrix.json` and builds each pair for every supported target. Existing complete release assets are skipped.
+The workflow reads tool/version pairs from `ci/tools.json` and supported targets from `ci/targets.json`. Linux builds run inside the matching distro container. Existing complete release assets are skipped.
 
 Use the `Rebuild database binary` workflow to force rebuild and re-upload one tool/version across every supported target.
 
@@ -130,31 +144,31 @@ Local package verification:
 
 ```bash
 export VERSION=18.4
-export TARGET=linux-amd64
+export TARGET=ubuntu24-amd64
 
-ci/postgres.sh package
-ci/postgres.sh verify
+ci/tools/postgres.sh package
+ci/tools/postgres.sh verify
 ```
 
 Valkey verification checks both native Valkey command names and Redis-compatible command names:
 
 ```bash
 export VERSION=9.1.0
-export TARGET=linux-amd64
+export TARGET=fedora44-amd64
 
-ci/valkey.sh package
-ci/valkey.sh verify
+ci/tools/valkey.sh package
+ci/tools/valkey.sh verify
 ```
 
 MySQL is repackaged from official MySQL Community generic archives:
 
 ```bash
 export VERSION=9.7.1
-export TARGET=linux-amd64
+export TARGET=ubuntu24-amd64
 
-ci/mysql.sh build
-ci/mysql.sh package
-ci/mysql.sh verify
+ci/tools/mysql.sh build
+ci/tools/mysql.sh package
+ci/tools/mysql.sh verify
 ```
 
 ## Available Versions

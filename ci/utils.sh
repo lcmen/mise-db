@@ -80,8 +80,37 @@ read_env() {
     echo "TARGET is required" >&2
     exit 2
   fi
+}
 
-  validate_target "$TARGET"
+# Returns success for Linux distro-specific targets.
+is_linux_target() {
+  target="$1"
+
+  case "$target" in
+    ubuntu24-amd64|ubuntu24-arm64|ubuntu26-amd64|ubuntu26-arm64|fedora43-amd64|fedora43-arm64|fedora44-amd64|fedora44-arm64) ;;
+    *) return 1 ;;
+  esac
+}
+
+# Verifies that a binary has no missing dynamic library dependencies on Linux.
+check_linked_libraries() {
+  binary="$1"
+
+  if ! is_linux_target "$TARGET"; then
+    return
+  fi
+
+  if ! command -v ldd >/dev/null 2>&1; then
+    echo "ldd is required to verify Linux archives" >&2
+    exit 1
+  fi
+
+  ldd_output="$(ldd "$binary")"
+  echo "$ldd_output"
+  if printf '%s\n' "$ldd_output" | grep 'not found' >/dev/null; then
+    echo "missing dynamic library dependencies for $binary" >&2
+    exit 1
+  fi
 }
 
 # Creates or updates the GitHub release asset for tool, version, and archive args.
@@ -109,14 +138,4 @@ sha256() {
   else
     shasum -a 256 "$archive" > "$archive.sha256"
   fi
-}
-
-# Validates the target arg against supported release targets.
-validate_target() {
-  target="$1"
-
-  case "$target" in
-    linux-amd64|linux-arm64|darwin-amd64|darwin-arm64) ;;
-    *) echo "unsupported target: $target" >&2; exit 1 ;;
-  esac
 }

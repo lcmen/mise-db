@@ -4,7 +4,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ci/utils.sh
-. "$script_dir/utils.sh"
+. "$script_dir/../utils.sh"
 
 usage() {
   cat >&2 <<EOF
@@ -22,8 +22,8 @@ archive_path() {
 
 source_file() {
   case "$TARGET" in
-    linux-amd64) echo "mysql-${VERSION}-linux-glibc2.28-x86_64.tar.xz" ;;
-    linux-arm64) echo "mysql-${VERSION}-linux-glibc2.28-aarch64.tar.xz" ;;
+    ubuntu24-amd64|ubuntu26-amd64|fedora43-amd64|fedora44-amd64) echo "mysql-${VERSION}-linux-glibc2.28-x86_64.tar.xz" ;;
+    ubuntu24-arm64|ubuntu26-arm64|fedora43-arm64|fedora44-arm64) echo "mysql-${VERSION}-linux-glibc2.28-aarch64.tar.xz" ;;
     darwin-amd64) echo "mysql-${VERSION}-macos15-x86_64.tar.gz" ;;
     darwin-arm64) echo "mysql-${VERSION}-macos15-arm64.tar.gz" ;;
     *) echo "unsupported target: $TARGET" >&2; exit 1 ;;
@@ -88,6 +88,19 @@ verify_mysql() {
   trap 'rm -rf "$tmp_dir"' EXIT
 
   tar -xf "$archive" -C "$tmp_dir"
+
+  required_bins='mysqld mysql mysqladmin mysqldump'
+  for bin in $required_bins; do
+    if [ ! -x "$tmp_dir/bin/$bin" ]; then
+      echo "archive missing executable: bin/$bin" >&2
+      exit 1
+    fi
+  done
+
+  check_linked_libraries "$tmp_dir/bin/mysqld"
+  check_linked_libraries "$tmp_dir/bin/mysql"
+  check_linked_libraries "$tmp_dir/bin/mysqladmin"
+  check_linked_libraries "$tmp_dir/bin/mysqldump"
 
   "$tmp_dir/bin/mysqld" --version
   "$tmp_dir/bin/mysql" --version

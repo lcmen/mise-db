@@ -208,10 +208,16 @@ hooks/
   backend_install.lua
   backend_exec_env.lua
 ci/
-  darwin.sh
-  linux.sh
-  matrix.json
-  postgres.sh
+  builders/
+    darwin.sh
+    linux.sh
+  tools/
+    mysql.sh
+    postgres.sh
+    valkey.sh
+  targets.json
+  tools.json
+  released.sh
   utils.sh
 .github/
   workflows/
@@ -281,10 +287,10 @@ GitHub Actions should build or repackage database binaries and publish them as G
 
 ### PostgreSQL
 
-Compile from source in CI through `ci/postgres.sh build`. The script uses:
+Compile from source in CI through `ci/tools/postgres.sh build`. The script uses:
 
 ```bash
-VERSION=18.4 TARGET=linux-amd64 ci/postgres.sh build
+VERSION=18.4 TARGET=ubuntu24-amd64 ci/tools/postgres.sh build
 ```
 
 Internally it downloads PostgreSQL source, extracts it into `src/`, installs into `prefix/`, then packaging writes:
@@ -308,7 +314,7 @@ For v0.1, prefer repackaging official MySQL Community generic archives instead o
 
 ### Valkey
 
-Build Valkey from source in CI through `ci/valkey.sh build`. Keep the public tool name `valkey`, and include Redis-compatible command names (`redis-server` and `redis-cli`) in the archive for drop-in compatibility.
+Build Valkey from source in CI through `ci/tools/valkey.sh build`. Keep the public tool name `valkey`, and include Redis-compatible command names (`redis-server` and `redis-cli`) in the archive for drop-in compatibility.
 
 ---
 
@@ -332,10 +338,11 @@ The normal workflow is:
 It reads tool/version pairs from:
 
 ```text
-ci/matrix.json
+ci/tools.json
+ci/targets.json
 ```
 
-and builds each pair for every supported target. Existing complete release assets are skipped when both the archive and `.sha256` already exist.
+and builds each tool/version pair for every supported target. Existing complete release assets are skipped when both the archive and `.sha256` already exist.
 
 The force rebuild workflow is:
 
@@ -348,23 +355,23 @@ It accepts `tool` and `version` inputs and rebuilds/re-uploads that pair for eve
 Both workflows should:
 
 1. Check out the repo.
-2. Install platform dependencies through `ci/linux.sh setup` or `ci/darwin.sh setup`.
-3. Build or repackage the selected tool/version through `ci/<tool>.sh build`.
+2. Install platform dependencies through `ci/builders/linux.sh setup` or `ci/builders/darwin.sh setup`.
+3. Build or repackage the selected tool/version through `ci/tools/<tool>.sh build`.
 4. Package the result into `dist/<tool>-<version>-<target>.tar.xz`.
 5. Generate a `.sha256` file.
-6. Verify the archive through `ci/<tool>.sh verify`.
+6. Verify the archive through `ci/tools/<tool>.sh verify`.
 7. Create or update the GitHub Release `<tool>-<version>` and upload assets with `--clobber`.
 
 ---
 
 ## Verification
 
-`ci/<tool>.sh verify` should extract a generated archive into a temporary directory and run version commands.
+`ci/tools/<tool>.sh verify` should extract a generated archive into a temporary directory and run version commands.
 
 PostgreSQL verification:
 
 ```bash
-VERSION=18.4 TARGET=linux-amd64 ci/postgres.sh verify
+VERSION=18.4 TARGET=ubuntu24-amd64 ci/tools/postgres.sh verify
 ```
 
 That command runs `bin/postgres --version`, `bin/psql --version`, and `bin/initdb --version`.
