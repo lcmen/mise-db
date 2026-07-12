@@ -54,7 +54,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Build, package, and verify in distro container
+      - name: Build and package in distro container
         run: |
           docker run --rm \
             -v "$PWD:/work" \
@@ -63,7 +63,18 @@ jobs:
             -e VERSION \
             -e TARGET \
             "${{ matrix.target.image }}" \
-            bash -lc 'ci/builders/linux.sh setup && ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package && ci/tools/${TOOL}.sh verify'
+            bash -lc 'ci/builders/linux.sh setup && ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package'
+
+      - name: Verify in separate distro container
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e TOOL \
+            -e VERSION \
+            -e TARGET \
+            "${{ matrix.target.image }}" \
+            bash -lc 'ci/builders/linux.sh runtime && ci/tools/${TOOL}.sh verify'
 
       - name: Restore workspace ownership
         run: sudo chown -R "$(id -u):$(id -g)" dist prefix src

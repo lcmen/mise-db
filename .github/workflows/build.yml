@@ -50,7 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ci/released.sh "$TOOL" "$VERSION" "$TARGET"
 
-      - name: Build, package, and verify in distro container
+      - name: Build and package in distro container
         if: steps.existing.outputs.exists != 'true'
         run: |
           docker run --rm \
@@ -60,7 +60,19 @@ jobs:
             -e VERSION \
             -e TARGET \
             "${{ matrix.target.image }}" \
-            bash -lc 'ci/builders/linux.sh setup && ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package && ci/tools/${TOOL}.sh verify'
+            bash -lc 'ci/builders/linux.sh setup && ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package'
+
+      - name: Verify in separate distro container
+        if: steps.existing.outputs.exists != 'true'
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e TOOL \
+            -e VERSION \
+            -e TARGET \
+            "${{ matrix.target.image }}" \
+            bash -lc 'ci/builders/linux.sh runtime && ci/tools/${TOOL}.sh verify'
 
       - name: Restore workspace ownership
         if: steps.existing.outputs.exists != 'true'

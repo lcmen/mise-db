@@ -7,7 +7,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$script_dir/../utils.sh"
 
 usage() {
-  echo "usage: $0 setup" >&2
+  echo "usage: $0 setup|runtime" >&2
 }
 
 setup_apt() {
@@ -56,11 +56,57 @@ setup_dnf() {
     zlib-devel
 }
 
+runtime_apt() {
+  apt update
+
+  apt install -y --no-install-recommends \
+    ca-certificates \
+    libaio1t64 \
+    libnuma1 \
+    libreadline8t64 \
+    libxslt1.1 \
+    openssl \
+    xz-utils \
+    zlib1g
+
+  if apt-cache show libxml2 >/dev/null 2>&1; then
+    apt install -y --no-install-recommends libxml2
+  else
+    apt install -y --no-install-recommends libxml2-16
+  fi
+}
+
+runtime_dnf() {
+  dnf install -y \
+    ca-certificates \
+    libaio \
+    libicu \
+    libxml2 \
+    libxslt \
+    numactl-libs \
+    openssl-libs \
+    readline \
+    tar \
+    xz \
+    zlib
+}
+
 setup() {
   if command -v apt >/dev/null 2>&1; then
     setup_apt
   elif command -v dnf >/dev/null 2>&1; then
     setup_dnf
+  else
+    echo "unsupported Linux package manager; expected apt or dnf" >&2
+    exit 1
+  fi
+}
+
+runtime() {
+  if command -v apt >/dev/null 2>&1; then
+    runtime_apt
+  elif command -v dnf >/dev/null 2>&1; then
+    runtime_dnf
   else
     echo "unsupported Linux package manager; expected apt or dnf" >&2
     exit 1
@@ -74,5 +120,6 @@ fi
 
 case "$1" in
   setup) setup ;;
+  runtime) runtime ;;
   *) usage; exit 2 ;;
 esac

@@ -61,6 +61,28 @@ Supported platforms:
 
 Linux binaries are built and verified for the specific distro release named in the asset. Other Linux distributions are unsupported in v0.1. Arch Linux is intentionally excluded because it is a rolling release, and Ubuntu interim releases such as 25.x are unsupported unless dedicated artifacts are added. Windows and Alpine/musl are not supported yet.
 
+## Linux Runtime Packages
+
+Linux archives include the database binaries and selected private runtime libraries, but they still expect common distro runtime packages to be installed.
+
+Ubuntu 24.04:
+
+```bash
+sudo apt install ca-certificates libaio1t64 libnuma1 libreadline8t64 libxml2 libxslt1.1 openssl xz-utils zlib1g
+```
+
+Ubuntu 26.04:
+
+```bash
+sudo apt install ca-certificates libaio1t64 libnuma1 libreadline8t64 libxml2-16 libxslt1.1 openssl xz-utils zlib1g
+```
+
+Fedora 43 and 44:
+
+```bash
+sudo dnf install ca-certificates libaio libicu libxml2 libxslt numactl-libs openssl-libs readline tar xz zlib
+```
+
 ## GitHub Release Assets
 
 Database binaries are hosted as GitHub Release assets in this repository.
@@ -132,49 +154,10 @@ valkey 9    -> latest available 9.x
 
 The plugin publishes and installs exact upstream versions only. It does not publish fake major-only versions such as `18`.
 
-## Manual GitHub Actions Builds
-
-Use the `Build database binaries` workflow from the GitHub Actions tab.
-
-The workflow reads tool/version pairs from `ci/tools.json` and supported targets from `ci/targets.json`. Linux builds run inside the matching distro container. Existing complete release assets are skipped.
-
-Use the `Rebuild database binary` workflow to force rebuild and re-upload one tool/version across every supported target.
-
-Local package verification:
-
-```bash
-export VERSION=18.4
-export TARGET=ubuntu24-amd64
-
-ci/tools/postgres.sh package
-ci/tools/postgres.sh verify
-```
-
-Valkey verification checks both native Valkey command names and Redis-compatible command names:
-
-```bash
-export VERSION=9.1.0
-export TARGET=fedora44-amd64
-
-ci/tools/valkey.sh package
-ci/tools/valkey.sh verify
-```
-
-MySQL is repackaged from official MySQL Community generic archives:
-
-```bash
-export VERSION=9.7.1
-export TARGET=ubuntu24-amd64
-
-ci/tools/mysql.sh build
-ci/tools/mysql.sh package
-ci/tools/mysql.sh verify
-```
-
 ## Available Versions
 
-| Tool | Versions |
-| --- | --- |
-| `postgres` | `16.14`, `17.10`, `18.4` |
-| `mysql` | `8.0.46`, `8.4.9`, `9.7.1` |
-| `valkey` | `7.2.13`, `8.1.8`, `9.1.0` |
+| Tool       | Versions                   |
+| ---------- | -------------------------- |
+| `postgres` | `16.14`, `17.10`, `18.4`   |
+| `mysql`    | `8.0.46`, `8.4.9`, `9.7.1` |
+| `valkey`   | `7.2.13`, `8.1.8`, `9.1.0` |
