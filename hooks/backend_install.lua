@@ -1,9 +1,35 @@
 local common = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
 
+local function linux_distro()
+    local values = {}
+    local handle = io.open("/etc/os-release", "r")
+    if handle == nil then
+        error("unsupported Linux distribution: /etc/os-release was not found")
+    end
+
+    for line in handle:lines() do
+        local key, value = line:match("^([A-Z0-9_]+)=(.*)$")
+        if key and value then
+            value = value:gsub('^"', ""):gsub('"$', "")
+            values[key] = value
+        end
+    end
+    handle:close()
+
+    return values
+end
+
+local function linux_target(arch_type, env_type)
+    local distro = linux_distro()
+    local id = distro.ID or ""
+    local version_id = (distro.VERSION_ID or ""):match("^[^.]+") or ""
+
+    return id .. version_id .. "-" .. arch_type
+end
+
 local function target()
     local os_type = RUNTIME and RUNTIME.osType
     local arch_type = RUNTIME and RUNTIME.archType
-    local env_type = RUNTIME and RUNTIME.envType
 
     if os_type == "darwin" then
         if arch_type == "amd64" then
@@ -12,23 +38,14 @@ local function target()
         if arch_type == "arm64" then
             return "darwin-arm64"
         end
-        error("unsupported macOS architecture: " .. tostring(arch_type) .. "; supported: amd64, arm64")
+        error("unsupported macOS architecture: " .. tostring(arch_type) .. ".")
     end
 
     if os_type == "linux" then
-        if env_type ~= "gnu" then
-            error("unsupported Linux libc: " .. tostring(env_type) .. "; Linux builds require glibc and are built and verified on Ubuntu")
-        end
-        if arch_type == "amd64" then
-            return "linux-amd64"
-        end
-        if arch_type == "arm64" then
-            return "linux-arm64"
-        end
-        error("unsupported Linux architecture: " .. tostring(arch_type) .. "; supported: amd64, arm64")
+        return linux_target(arch_type)
     end
 
-    error("unsupported platform: " .. tostring(os_type) .. "; supported: glibc Linux built and verified on Ubuntu, and macOS")
+    error("unsupported platform: " .. tostring(os_type) .. ".")
 end
 
 local function asset_name(tool, version, install_target)

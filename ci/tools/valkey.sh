@@ -4,7 +4,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ci/utils.sh
-. "$script_dir/utils.sh"
+. "$script_dir/../utils.sh"
 
 usage() {
   cat >&2 <<EOF
@@ -17,7 +17,7 @@ EOF
 }
 
 archive_path() {
-  echo "$PWD/dist/$(archive_name postgres "$VERSION" "$TARGET")"
+  echo "$PWD/dist/$(archive_name valkey "$VERSION" "$TARGET")"
 }
 
 configure_env() {
@@ -28,28 +28,19 @@ configure_env() {
         exit 1
       fi
 
-      export CPPFLAGS="${CPPFLAGS:-}"
-      export LDFLAGS="${LDFLAGS:-}"
-      export PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}"
-
-      for formula in openssl@3 icu4c libxml2 libxslt readline; do
-        formula_prefix="$(brew --prefix "$formula")"
-        CPPFLAGS="$CPPFLAGS -I$formula_prefix/include"
-        LDFLAGS="$LDFLAGS -L$formula_prefix/lib"
-        PKG_CONFIG_PATH="$formula_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-      done
-
-      export CPPFLAGS LDFLAGS PKG_CONFIG_PATH
-      export PATH="$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$(brew --prefix libxml2)/bin:$(brew --prefix libxslt)/bin:$PATH"
+      openssl_prefix="$(brew --prefix openssl@3)"
+      export CPPFLAGS="${CPPFLAGS:-} -I$openssl_prefix/include"
+      export LDFLAGS="${LDFLAGS:-} -L$openssl_prefix/lib"
+      export PKG_CONFIG_PATH="$openssl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
       ;;
   esac
 }
 
-build_postgres() {
+build_valkey() {
   read_env
 
   src="$PWD/src"
-  source_url="https://ftp.postgresql.org/pub/source/v${VERSION}/postgresql-${VERSION}.tar.bz2"
+  source_url="https://github.com/valkey-io/valkey/archive/refs/tags/${VERSION}.tar.gz"
 
   rm -rf "$src" "$PREFIX"
   mkdir -p "$src" "$PREFIX"
@@ -59,24 +50,18 @@ build_postgres() {
 
   cd "$src"
   configure_env
-  ./configure \
-    --prefix="$PREFIX" \
-    --with-openssl \
-    --with-icu \
-    --with-libxml \
-    --with-libxslt
-  make -j"$(cpu_count)"
-  make install
+  make -j"$(cpu_count)" BUILD_TLS=yes
+  make PREFIX="$PREFIX" BUILD_TLS=yes install
 
-  mkdir -p "$PREFIX/licenses/postgres"
-  cp COPYRIGHT "$PREFIX/licenses/postgres/COPYRIGHT"
+  mkdir -p "$PREFIX/licenses/valkey"
+  cp COPYING "$PREFIX/licenses/valkey/COPYING"
 }
 
-package_postgres() {
+package_valkey() {
   read_env
   archive="$(archive_path)"
 
-  required_bins='postgres pg_ctl initdb psql createdb dropdb createuser dropuser'
+  required_bins='valkey-server valkey-cli redis-server redis-cli'
   for bin in $required_bins; do
     if [ ! -x "$PREFIX/bin/$bin" ]; then
       echo "missing executable: bin/$bin" >&2
@@ -85,7 +70,7 @@ package_postgres() {
   done
 
   archive_dir="$(dirname "$archive")"
-  mkdir -p "$PREFIX/lib" "$PREFIX/share" "$PREFIX/licenses/postgres" "$archive_dir"
+  mkdir -p "$PREFIX/lib" "$PREFIX/share" "$PREFIX/licenses/valkey" "$archive_dir"
 
   archive_basename="$(basename "$archive")"
   tar -C "$PREFIX" -cf - . | xz -c > "$archive"
@@ -94,7 +79,7 @@ package_postgres() {
   echo "$archive"
 }
 
-verify_postgres() {
+verify_valkey() {
   read_env
   archive="$(archive_path)"
 
@@ -108,12 +93,26 @@ verify_postgres() {
 
   tar -xf "$archive" -C "$tmp_dir"
 
-  "$tmp_dir/bin/postgres" --version
-  "$tmp_dir/bin/psql" --version
-  "$tmp_dir/bin/initdb" --version
+  required_bins='valkey-server valkey-cli redis-server redis-cli'
+  for bin in $required_bins; do
+    if [ ! -x "$tmp_dir/bin/$bin" ]; then
+      echo "archive missing executable: bin/$bin" >&2
+      exit 1
+    fi
+  done
+
+  check_linked_libraries "$tmp_dir/bin/valkey-server"
+  check_linked_libraries "$tmp_dir/bin/valkey-cli"
+  check_linked_libraries "$tmp_dir/bin/redis-server"
+  check_linked_libraries "$tmp_dir/bin/redis-cli"
+
+  "$tmp_dir/bin/valkey-server" --version
+  "$tmp_dir/bin/valkey-cli" --version
+  "$tmp_dir/bin/redis-server" --version
+  "$tmp_dir/bin/redis-cli" --version
 }
 
-release_postgres() {
+release_valkey() {
   read_env
   archive="$(archive_path)"
 
@@ -127,7 +126,7 @@ release_postgres() {
     exit 1
   fi
 
-  release_upload postgres "$VERSION" "$archive"
+  release_upload valkey "$VERSION" "$archive"
 }
 
 if [ "$#" -lt 1 ]; then
@@ -143,9 +142,9 @@ if [ "$#" -ne 0 ]; then
 fi
 
 case "$command" in
-  build) build_postgres ;;
-  package) package_postgres ;;
-  verify) verify_postgres ;;
-  release) release_postgres ;;
+  build) build_valkey ;;
+  package) package_valkey ;;
+  verify) verify_valkey ;;
+  release) release_valkey ;;
   *) usage; exit 2 ;;
 esac

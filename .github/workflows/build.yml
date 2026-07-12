@@ -1,4 +1,4 @@
-name: Build all tools
+name: Build all binaries
 
 on:
   workflow_dispatch:
@@ -11,6 +11,8 @@ jobs:
     name: Read build matrix
     runs-on: ubuntu-24.04
     outputs:
+      darwin_targets: ${{ steps.matrix.outputs.darwin_targets }}
+      linux_targets: ${{ steps.matrix.outputs.linux_targets }}
       tools: ${{ steps.matrix.outputs.tools }}
     steps:
       - name: Check out repository
@@ -19,28 +21,18 @@ jobs:
       - name: Read matrix
         id: matrix
         run: |
-          echo "tools=$(jq -c .tool ci/matrix.json)" >> "$GITHUB_OUTPUT"
+          echo "darwin_targets=$(jq -c .darwin ci/targets.json)" >> "$GITHUB_OUTPUT"
+          echo "linux_targets=$(jq -c .linux ci/targets.json)" >> "$GITHUB_OUTPUT"
+          echo "tools=$(jq -c . ci/tools.json)" >> "$GITHUB_OUTPUT"
 
-  build:
+  build-linux:
     name: ${{ matrix.tool.tool }} ${{ matrix.tool.version }} ${{ matrix.target.name }}
     needs: matrix
     strategy:
       fail-fast: false
       matrix:
         tool: ${{ fromJSON(needs.matrix.outputs.tools) }}
-        target:
-          - name: linux-amd64
-            runner: ubuntu-24.04
-            os: linux
-          - name: linux-arm64
-            runner: ubuntu-24.04-arm
-            os: linux
-          - name: darwin-amd64
-            runner: macos-15-intel
-            os: darwin
-          - name: darwin-arm64
-            runner: macos-15
-            os: darwin
+        target: ${{ fromJSON(needs.matrix.outputs.linux_targets) }}
 
     runs-on: ${{ matrix.target.runner }}
     env:
@@ -56,44 +48,65 @@ jobs:
         id: existing
         env:
           GH_TOKEN: ${{ github.token }}
+        run: ci/released.sh "$TOOL" "$VERSION" "$TARGET"
+
+      - name: Build, package, and verify in distro container
+        if: steps.existing.outputs.exists != 'true'
         run: |
-          tag="${TOOL}-${VERSION}"
-          archive="${TOOL}-${VERSION}-${TARGET}.tar.xz"
-          checksum="${archive}.sha256"
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e TOOL \
+            -e VERSION \
+            -e TARGET \
+            "${{ matrix.target.image }}" \
+            bash -lc 'ci/builders/linux.sh setup && ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package && ci/tools/${TOOL}.sh verify'
 
-          if gh release view "$tag" --json assets --jq '.assets[].name' > assets.txt 2>/dev/null; then
-            if grep -Fx "$archive" assets.txt >/dev/null && grep -Fx "$checksum" assets.txt >/dev/null; then
-              echo "exists=true" >> "$GITHUB_OUTPUT"
-              echo "$archive and $checksum already exist in $tag"
-            else
-              echo "exists=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Install Linux build dependencies
-        if: steps.existing.outputs.exists != 'true' && matrix.target.os == 'linux'
-        run: ci/linux.sh setup
-
-      - name: Install Darwin build dependencies
-        if: steps.existing.outputs.exists != 'true' && matrix.target.os == 'darwin'
-        run: ci/darwin.sh setup
-
-      - name: Build
+      - name: Restore workspace ownership
         if: steps.existing.outputs.exists != 'true'
-        run: "ci/${TOOL}.sh build"
-
-      - name: Package
-        if: steps.existing.outputs.exists != 'true'
-        run: "ci/${TOOL}.sh package"
-
-      - name: Verify
-        if: steps.existing.outputs.exists != 'true'
-        run: "ci/${TOOL}.sh verify"
+        run: sudo chown -R "$(id -u):$(id -g)" dist prefix src
 
       - name: Create or update release
         if: steps.existing.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: "ci/${TOOL}.sh release"
+        run: "ci/tools/${TOOL}.sh release"
+
+  build-darwin:
+    name: ${{ matrix.tool.tool }} ${{ matrix.tool.version }} ${{ matrix.target.name }}
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: ${{ fromJSON(needs.matrix.outputs.tools) }}
+        target: ${{ fromJSON(needs.matrix.outputs.darwin_targets) }}
+
+    runs-on: ${{ matrix.target.runner }}
+    env:
+      TOOL: ${{ matrix.tool.tool }}
+      VERSION: ${{ matrix.tool.version }}
+      TARGET: ${{ matrix.target.name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Check existing release assets
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ci/released.sh "$TOOL" "$VERSION" "$TARGET"
+
+      - name: Install Darwin build dependencies
+        if: steps.existing.outputs.exists != 'true'
+        run: ci/builders/darwin.sh setup
+
+      - name: Build, package and verify
+        if: steps.existing.outputs.exists != 'true'
+        run: "ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package && ci/tools/${TOOL}.sh verify"
+
+      - name: Create or update release
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: "ci/tools/${TOOL}.sh release"

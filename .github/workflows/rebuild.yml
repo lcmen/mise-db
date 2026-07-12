@@ -1,4 +1,4 @@
-name: Rebuild a specific tool
+name: Rebuild a specific binary
 
 on:
   workflow_dispatch:
@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - postgres
           - mysql
+          - postgres
           - valkey
       version:
         description: Version to rebuild, for example 18.4.
@@ -20,24 +20,29 @@ permissions:
   contents: write
 
 jobs:
-  rebuild:
+  matrix:
+    name: Read target matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      darwin_targets: ${{ steps.matrix.outputs.darwin_targets }}
+      linux_targets: ${{ steps.matrix.outputs.linux_targets }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Read matrix
+        id: matrix
+        run: |
+          echo "darwin_targets=$(jq -c .darwin ci/targets.json)" >> "$GITHUB_OUTPUT"
+          echo "linux_targets=$(jq -c .linux ci/targets.json)" >> "$GITHUB_OUTPUT"
+
+  rebuild-linux:
     name: ${{ inputs.tool }} ${{ inputs.version }} ${{ matrix.target.name }}
+    needs: matrix
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - name: linux-amd64
-            runner: ubuntu-24.04
-            os: linux
-          - name: linux-arm64
-            runner: ubuntu-24.04-arm
-            os: linux
-          - name: darwin-amd64
-            runner: macos-15-intel
-            os: darwin
-          - name: darwin-arm64
-            runner: macos-15
-            os: darwin
+        target: ${{ fromJSON(needs.matrix.outputs.linux_targets) }}
 
     runs-on: ${{ matrix.target.runner }}
     env:
@@ -49,24 +54,51 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Install Linux build dependencies
-        if: matrix.target.os == 'linux'
-        run: ci/linux.sh setup
+      - name: Build, package, and verify in distro container
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e TOOL \
+            -e VERSION \
+            -e TARGET \
+            "${{ matrix.target.image }}" \
+            bash -lc 'ci/builders/linux.sh setup && ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package && ci/tools/${TOOL}.sh verify'
 
-      - name: Install Darwin build dependencies
-        if: matrix.target.os == 'darwin'
-        run: ci/darwin.sh setup
-
-      - name: Build
-        run: "ci/${TOOL}.sh build"
-
-      - name: Package
-        run: "ci/${TOOL}.sh package"
-
-      - name: Verify
-        run: "ci/${TOOL}.sh verify"
+      - name: Restore workspace ownership
+        run: sudo chown -R "$(id -u):$(id -g)" dist prefix src
 
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: "ci/${TOOL}.sh release"
+        run: "ci/tools/${TOOL}.sh release"
+
+  rebuild-darwin:
+    name: ${{ inputs.tool }} ${{ inputs.version }} ${{ matrix.target.name }}
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.matrix.outputs.darwin_targets) }}
+
+    runs-on: ${{ matrix.target.runner }}
+    env:
+      TOOL: ${{ inputs.tool }}
+      VERSION: ${{ inputs.version }}
+      TARGET: ${{ matrix.target.name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install Darwin build dependencies
+        run: ci/builders/darwin.sh setup
+
+      - name: Build, package and verify
+        if: steps.existing.outputs.exists != 'true'
+        run: "ci/tools/${TOOL}.sh build && ci/tools/${TOOL}.sh package && ci/tools/${TOOL}.sh verify"
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: "ci/tools/${TOOL}.sh release"
