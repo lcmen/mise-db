@@ -48,30 +48,28 @@ Exact versions are also supported:
 
 Supported platforms:
 
-- Ubuntu 24.04 LTS x86_64 (`ubuntu24-amd64`)
-- Ubuntu 24.04 LTS arm64 (`ubuntu24-arm64`)
-- Ubuntu 26.04 LTS x86_64 (`ubuntu26-amd64`)
-- Ubuntu 26.04 LTS arm64 (`ubuntu26-arm64`)
-- Fedora 43 x86_64 (`fedora43-amd64`)
-- Fedora 43 arm64 (`fedora43-arm64`)
-- Fedora 44 x86_64 (`fedora44-amd64`)
-- Fedora 44 arm64 (`fedora44-arm64`)
-- macOS x86_64 (`darwin-amd64`)
 - macOS arm64 (`darwin-arm64`)
+- macOS x86_64 (`darwin-amd64`)
+- Fedora 43 arm64 (`fedora43-arm64`)
+- Fedora 43 x86_64 (`fedora43-amd64`)
+- Fedora 44 arm64 (`fedora44-arm64`)
+- Fedora 44 x86_64 (`fedora44-amd64`)
+- Ubuntu 24.04 LTS arm64 (`ubuntu24-arm64`)
+- Ubuntu 24.04 LTS x86_64 (`ubuntu24-amd64`)
+- Ubuntu 26.04 LTS arm64 (`ubuntu26-arm64`)
+- Ubuntu 26.04 LTS x86_64 (`ubuntu26-amd64`)
 
-Linux binaries are built and verified for the specific distro release named in the asset. Other Linux distributions are unsupported in v0.1. Arch Linux is intentionally excluded because it is a rolling release, and Ubuntu interim releases such as 25.x are unsupported unless dedicated artifacts are added. Windows and Alpine/musl are not supported yet.
+## Requirements
 
-## Linux Runtime Packages
+### Ubuntu
 
-Linux archives include the database binaries and selected private runtime libraries, but they still expect common distro runtime packages to be installed.
-
-Ubuntu 24.04:
+#### Ubuntu 24.04:
 
 ```bash
 sudo apt install ca-certificates libaio1t64 libncurses6 libnuma1 libreadline8t64 libxml2 libxslt1.1 openssl xz-utils zlib1g
 ```
 
-Ubuntu 26.04:
+#### Ubuntu 26.04:
 
 ```bash
 sudo apt install ca-certificates libaio1t64 libncurses6 libnuma1 libreadline8t64 libxml2-16 libxslt1.1 openssl xz-utils zlib1g
@@ -91,29 +89,11 @@ For arm64:
 sudo ln -s /usr/lib/aarch64-linux-gnu/libaio.so.1t64 /usr/lib/libaio.so.1
 ```
 
-Fedora 43 and 44:
+### Fedora
 
 ```bash
 sudo dnf install ca-certificates libaio libicu libxml2 libxslt numactl-libs openssl-libs readline tar xz zlib
 ```
-
-## Version Resolution
-
-The plugin lists concrete versions from GitHub Releases by reading tags named:
-
-```text
-<tool>-<version>
-```
-
-Partial versions resolve to the latest matching concrete version. For example:
-
-```text
-postgres 18 -> latest available 18.x
-mysql 9    -> latest available 9.x
-valkey 9    -> latest available 9.x
-```
-
-The plugin publishes and installs exact upstream versions only. It does not publish fake major-only versions such as `18`.
 
 ## Available Versions
 

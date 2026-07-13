@@ -3,6 +3,10 @@ name: Build all binaries
 on:
   workflow_dispatch:
 
+concurrency:
+  group: mise-db-release-builds
+  cancel-in-progress: false
+
 permissions:
   contents: write
 

@@ -19,7 +19,23 @@ on:
         description: Target to rebuild, or all.
         required: true
         default: all
-        type: string
+        type: choice
+        options:
+          - all
+          - darwin-amd64
+          - darwin-arm64
+          - fedora43-amd64
+          - fedora43-arm64
+          - fedora44-amd64
+          - fedora44-arm64
+          - ubuntu24-amd64
+          - ubuntu24-arm64
+          - ubuntu26-amd64
+          - ubuntu26-arm64
+
+concurrency:
+  group: mise-db-release-builds
+  cancel-in-progress: false
 
 permissions:
   contents: write
