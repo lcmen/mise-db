@@ -77,63 +77,24 @@ Ubuntu 26.04:
 sudo apt install ca-certificates libaio1t64 libnuma1 libreadline8t64 libxml2-16 libxslt1.1 openssl xz-utils zlib1g
 ```
 
+MySQL on Ubuntu 26.04 also needs a `libaio.so.1` compatibility symlink.
+
+For x86_64:
+
+```bash
+sudo ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/libaio.so.1
+```
+
+For arm64:
+
+```bash
+sudo ln -s /usr/lib/aarch64-linux-gnu/libaio.so.1t64 /usr/lib/libaio.so.1
+```
+
 Fedora 43 and 44:
 
 ```bash
 sudo dnf install ca-certificates libaio libicu libxml2 libxslt numactl-libs openssl-libs readline tar xz zlib
-```
-
-## GitHub Release Assets
-
-Database binaries are hosted as GitHub Release assets in this repository.
-
-Release tags use:
-
-```text
-<tool>-<version>
-```
-
-Example:
-
-```text
-postgres-18.4
-mysql-9.7.1
-valkey-9.1.0
-```
-
-Assets use:
-
-```text
-<tool>-<version>-<target>.tar.xz
-<tool>-<version>-<target>.tar.xz.sha256
-```
-
-Examples:
-
-```text
-postgres-18.4-ubuntu24-amd64.tar.xz
-postgres-18.4-ubuntu24-arm64.tar.xz
-postgres-18.4-ubuntu26-amd64.tar.xz
-postgres-18.4-ubuntu26-arm64.tar.xz
-postgres-18.4-fedora43-amd64.tar.xz
-postgres-18.4-fedora43-arm64.tar.xz
-postgres-18.4-fedora44-amd64.tar.xz
-postgres-18.4-fedora44-arm64.tar.xz
-postgres-18.4-darwin-amd64.tar.xz
-postgres-18.4-darwin-arm64.tar.xz
-mysql-9.7.1-ubuntu24-amd64.tar.xz
-mysql-9.7.1-ubuntu24-arm64.tar.xz
-valkey-9.1.0-fedora44-amd64.tar.xz
-valkey-9.1.0-fedora44-arm64.tar.xz
-```
-
-Archives extract directly into the mise install directory and contain:
-
-```text
-bin/
-lib/
-share/
-licenses/
 ```
 
 ## Version Resolution

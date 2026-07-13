@@ -69,10 +69,16 @@ runtime_apt() {
     xz-utils \
     zlib1g
 
-  if apt-cache show libxml2 >/dev/null 2>&1; then
-    apt install -y --no-install-recommends libxml2
-  else
+  if [ -n "$(apt-cache policy libxml2-16 | awk '/Candidate:/ { print $2 }')" ]; then
     apt install -y --no-install-recommends libxml2-16
+  else
+    apt install -y --no-install-recommends libxml2
+  fi
+
+  # Create `libaio.so.1` compatibility symlink for Ubuntu 26.04+
+  libaio_t64="$(find /usr/lib \( -path '*/libaio.so.1t64' -type f -o -path '*/libaio.so.1t64' -type l \) 2>/dev/null | sort | head -n 1)"
+  if [ -n "$libaio_t64" ]; then
+    ln -sf "$libaio_t64" /usr/lib/libaio.so.1
   fi
 }
 

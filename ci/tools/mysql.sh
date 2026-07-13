@@ -35,45 +35,6 @@ version_line() {
   echo "$VERSION" | cut -d. -f1,2
 }
 
-find_linux_library() {
-  lib="$1"
-  pattern="${2:-$lib}"
-
-  if command -v ldconfig >/dev/null 2>&1; then
-    found="$(ldconfig -p 2>/dev/null | awk -v lib="$lib" '$1 == lib { print $NF; exit }')"
-    if [ -n "$found" ]; then
-      echo "$found"
-      return
-    fi
-  fi
-
-  find /lib /usr/lib \( -name "$pattern" -type f -o -name "$pattern" -type l \) 2>/dev/null | sort | head -n 1
-}
-
-copy_linux_library() {
-  lib="$1"
-  pattern="${2:-$lib}"
-  dest_dir="$PREFIX/lib/private"
-
-  found="$(find_linux_library "$lib" "$pattern")"
-  if [ -z "$found" ]; then
-    echo "missing runtime library: $lib" >&2
-    exit 1
-  fi
-
-  mkdir -p "$dest_dir"
-  cp -L "$found" "$dest_dir/$lib"
-}
-
-bundle_linux_runtime_libraries() {
-  if ! is_linux_target "$TARGET"; then
-    return
-  fi
-
-  # Ubuntu t64 packages provide libaio.so.1t64, but MySQL expects libaio.so.1.
-  copy_linux_library "libaio.so.1" "libaio.so.1*"
-}
-
 build_mysql() {
   read_env
 
@@ -106,7 +67,6 @@ package_mysql() {
 
   archive_dir="$(dirname "$archive")"
   mkdir -p "$PREFIX/lib" "$PREFIX/share" "$PREFIX/licenses/mysql" "$archive_dir"
-  bundle_linux_runtime_libraries
 
   archive_basename="$(basename "$archive")"
   tar -C "$PREFIX" -cf - . | xz -c > "$archive"
