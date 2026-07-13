@@ -70,10 +70,17 @@ runtime_apt() {
     xz-utils \
     zlib1g
 
+  # Ubuntu 26.04 uses different names
   if [ -n "$(apt-cache policy libxml2-16 | awk '/Candidate:/ { print $2 }')" ]; then
     apt install -y --no-install-recommends libxml2-16
   else
     apt install -y --no-install-recommends libxml2
+  fi
+
+  if [ -n "$(apt-cache policy libicu78 | awk '/Candidate:/ { print $2 }')" ]; then
+    apt install -y --no-install-recommends libicu78
+  else
+    apt install -y --no-install-recommends libicu74
   fi
 
   # Create `libaio.so.1` compatibility symlink for Ubuntu 26.04+
