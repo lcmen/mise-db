@@ -68,13 +68,13 @@ Linux archives include the database binaries and selected private runtime librar
 Ubuntu 24.04:
 
 ```bash
-sudo apt install ca-certificates libaio1t64 libnuma1 libreadline8t64 libxml2 libxslt1.1 openssl xz-utils zlib1g
+sudo apt install ca-certificates libaio1t64 libncurses6 libnuma1 libreadline8t64 libxml2 libxslt1.1 openssl xz-utils zlib1g
 ```
 
 Ubuntu 26.04:
 
 ```bash
-sudo apt install ca-certificates libaio1t64 libnuma1 libreadline8t64 libxml2-16 libxslt1.1 openssl xz-utils zlib1g
+sudo apt install ca-certificates libaio1t64 libncurses6 libnuma1 libreadline8t64 libxml2-16 libxslt1.1 openssl xz-utils zlib1g
 ```
 
 MySQL on Ubuntu 26.04 also needs a `libaio.so.1` compatibility symlink.

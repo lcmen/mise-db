@@ -62,6 +62,7 @@ runtime_apt() {
   apt install -y --no-install-recommends \
     ca-certificates \
     libaio1t64 \
+    libncurses6 \
     libnuma1 \
     libreadline8t64 \
     libxslt1.1 \

@@ -15,6 +15,11 @@ on:
         description: Version to rebuild, for example 18.4.
         required: true
         type: string
+      target:
+        description: Target to rebuild, or all.
+        required: true
+        default: all
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +30,8 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       darwin_targets: ${{ steps.matrix.outputs.darwin_targets }}
+      has_darwin_targets: ${{ steps.matrix.outputs.has_darwin_targets }}
+      has_linux_targets: ${{ steps.matrix.outputs.has_linux_targets }}
       linux_targets: ${{ steps.matrix.outputs.linux_targets }}
     steps:
       - name: Check out repository
@@ -32,13 +39,31 @@ jobs:
 
       - name: Read matrix
         id: matrix
+        env:
+          TARGET_INPUT: ${{ inputs.target }}
         run: |
-          echo "darwin_targets=$(jq -c .darwin ci/targets.json)" >> "$GITHUB_OUTPUT"
-          echo "linux_targets=$(jq -c .linux ci/targets.json)" >> "$GITHUB_OUTPUT"
+          if [ "$TARGET_INPUT" = "all" ]; then
+            darwin_targets="$(jq -c .darwin ci/targets.json)"
+            linux_targets="$(jq -c .linux ci/targets.json)"
+          else
+            darwin_targets="$(jq -c --arg target "$TARGET_INPUT" '[.darwin[] | select(.name == $target)]' ci/targets.json)"
+            linux_targets="$(jq -c --arg target "$TARGET_INPUT" '[.linux[] | select(.name == $target)]' ci/targets.json)"
+
+            if [ "$darwin_targets" = "[]" ] && [ "$linux_targets" = "[]" ]; then
+              echo "unsupported target: $TARGET_INPUT" >&2
+              exit 1
+            fi
+          fi
+
+          echo "darwin_targets=$darwin_targets" >> "$GITHUB_OUTPUT"
+          echo "linux_targets=$linux_targets" >> "$GITHUB_OUTPUT"
+          echo "has_darwin_targets=$(jq -r 'length > 0' <<< "$darwin_targets")" >> "$GITHUB_OUTPUT"
+          echo "has_linux_targets=$(jq -r 'length > 0' <<< "$linux_targets")" >> "$GITHUB_OUTPUT"
 
   rebuild-linux:
     name: ${{ inputs.tool }} ${{ inputs.version }} ${{ matrix.target.name }}
     needs: matrix
+    if: needs.matrix.outputs.has_linux_targets == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +112,7 @@ jobs:
   rebuild-darwin:
     name: ${{ inputs.tool }} ${{ inputs.version }} ${{ matrix.target.name }}
     needs: matrix
+    if: needs.matrix.outputs.has_darwin_targets == 'true'
     strategy:
       fail-fast: false
       matrix:
