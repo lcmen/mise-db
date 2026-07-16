@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC1091,SC2155
+set -euo pipefail
+
+# Resolve script path when invoked through symlink
+script_path="${BASH_SOURCE[0]}"
+while [[ -L "$script_path" ]]; do
+  script_dir="$(CDPATH='' cd -- "$(dirname -- "$script_path")" && pwd)"
+  link_target="$(readlink "$script_path")"
+
+  if [[ "$link_target" == /* ]]; then
+    script_path="$link_target"
+  else
+    script_path="$script_dir/$link_target"
+  fi
+done
+
+readonly LIBEXEC_DIR="$(CDPATH='' cd -- "$(dirname -- "$script_path")" && pwd)"
+readonly INSTALL_DIR="$(CDPATH='' cd -- "$LIBEXEC_DIR/.." && pwd)"
+
+if [[ ! -f "$INSTALL_DIR/manifest" ]]; then
+  echo "mise-db manifest not found: $INSTALL_DIR/manifest" >&2
+  exit 1
+fi
+
+source "$INSTALL_DIR/manifest"
+source "$LIBEXEC_DIR/lib/context.sh"
+source "$LIBEXEC_DIR/lib/dockers.sh"
+
+readonly CONTAINER="$(container_name)"
+readonly NETWORK="mise-db"
+
+ensure_data_dir() {
+  local data
+  data="$(data_dir)"
+  mkdir -p "$data"
+}
+
+create_server_container() {
+  ensure_image "$IMAGE"
+  ensure_network "$NETWORK"
+  ensure_data_dir
+
+  docker create \
+    --name "$CONTAINER" \
+    --network "$NETWORK" \
+    --volume "$(data_dir):/var/lib/postgresql/data" \
+    --env POSTGRES_USER="${PGUSER:-postgres}" \
+    --env POSTGRES_PASSWORD="${PGPASSWORD:-postgres}" \
+    --env PGDATA=/var/lib/postgresql/data/pgdata \
+    --health-cmd "pg_isready -U ${PGUSER:-postgres}" \
+    --health-interval 1s \
+    --health-timeout 5s \
+    --health-retries 60 \
+    "$IMAGE" >/dev/null
+}
+
+start_server() {
+  require_docker
+
+  if ! container_exists "$CONTAINER"; then
+    create_server_container
+  fi
+
+  if ! container_running "$CONTAINER"; then
+    docker start "$CONTAINER" >/dev/null
+  fi
+
+  container_ready "$CONTAINER" 60
+  printf 'PostgreSQL %s running as %s on Docker network %s\n' "$VERSION" "$CONTAINER" "$NETWORK"
+}
+
+stop_server() {
+  require_docker
+
+  if ! container_exists "$CONTAINER"; then
+    echo "PostgreSQL container does not exist: $CONTAINER" >&2
+    return 3
+  fi
+
+  if container_running "$CONTAINER"; then
+    docker stop "$CONTAINER" >/dev/null
+  fi
+
+  docker rm "$CONTAINER" >/dev/null
+}
+
+status_server() {
+  require_docker
+  container_status "$CONTAINER" "PostgreSQL"
+}
+
+reload_server() {
+  require_docker
+
+  if ! container_running "$CONTAINER"; then
+    echo "PostgreSQL container is not running: $CONTAINER" >&2
+    return 3
+  fi
+
+  docker exec "$CONTAINER" pg_ctl reload -D "${PGDATA:-/var/lib/postgresql/data/pgdata}"
+}
+
+run_client() {
+  local client="$1"
+  shift
+
+  require_docker
+  ensure_image "$IMAGE"
+  ensure_network "$NETWORK"
+
+  case "${1:-}" in
+    --help|--version|-V)
+      docker run --rm "$IMAGE" "$client" "$@"
+      return
+      ;;
+  esac
+
+  docker run --rm "$(docker_tty_args)" \
+    --network "$NETWORK" \
+    --volume "$PWD:$PWD" \
+    --workdir "$PWD" \
+    --env PGPASSWORD="${PGPASSWORD:-postgres}" \
+    "$IMAGE" "$client" "--host=$CONTAINER" --port=5432 "--username=${PGUSER:-postgres}" "$@"
+}
+
+pg_ctl_wrapper() {
+  local action="${1:-status}"
+  shift || true
+
+  case "$action" in
+    start)
+      start_server
+      ;;
+    stop)
+      stop_server "$@"
+      ;;
+    status)
+      status_server
+      ;;
+    restart)
+      stop_server "$@" || true
+      start_server
+      ;;
+    reload)
+      reload_server
+      ;;
+    *)
+      echo "mise-db pg_ctl supports start, stop, status, restart, and reload." >&2
+      echo "Unsupported pg_ctl action: $action" >&2
+      exit 2
+      ;;
+  esac
+}
+
+command_name="$(basename "$0")"
+
+case "$command_name" in
+  pg_ctl)
+    pg_ctl_wrapper "$@"
+    ;;
+  postgres)
+    pg_ctl_wrapper start
+    docker logs -f "$CONTAINER"
+    ;;
+  psql|pg_dump|pg_restore|createdb|dropdb|createuser|dropuser)
+    run_client "$command_name" "$@"
+    ;;
+  *)
+    echo "unsupported mise-db PostgreSQL command: $command_name" >&2
+    exit 2
+    ;;
+esac

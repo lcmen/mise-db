@@ -2,7 +2,7 @@
 
 ## Project
 
-This repository implements **mise-db**, a custom **mise backend plugin** for installing prebuilt database binaries.
+This repository implements **mise-db**, a custom **mise backend plugin** that installs versioned database command wrappers backed by OCI images.
 
 The GitHub repository is:
 
@@ -26,50 +26,68 @@ Then use it in `mise.toml`:
 
 ```toml
 [tools]
-"db:postgres" = "18"
-"db:mysql" = "8.4"
-"db:valkey" = "9"
+"db:postgres" = { version = "18.4", isolated = true }
 ```
 
-Phase 1 implements PostgreSQL, MySQL, and Valkey.
-
-Do **not** commit generated database binaries into git. Database binaries must be stored as GitHub Release assets.
+The previous native-binary release direction has been superseded by the container-backed wrapper direction. Do not add CI for compiling or packaging database binaries unless the project explicitly reverses that decision.
 
 ---
 
-## Final Product Behavior
+## Current State
 
-Partial versions must resolve to the latest matching concrete upstream version:
+The current implementation is a PostgreSQL-only Docker MVP.
+
+Implemented:
+
+- `BackendListVersions` returns known PostgreSQL versions.
+- `BackendInstall` validates `postgres`, pulls `postgres:<version>-alpine`, copies wrappers into the mise install path, writes a manifest, and creates command symlinks.
+- `BackendExecEnv` adds the install `bin/` directory to `PATH` and sets basic PostgreSQL credentials.
+- PostgreSQL wrappers manage a persistent Docker container and short-lived client containers.
+- Docker healthchecks are used for readiness.
+- `tests/postgres.test.sh` smoke-tests the wrapper install layout with Docker.
+
+Not implemented yet:
+
+- MySQL wrappers.
+- Valkey wrappers.
+- Apple `container` runtime adapter.
+- Host DNS through `devdns` or Apple Container DNS.
+- Image digest pinning.
+- Full `BackendExecEnv` host/container naming variables.
+- Native database binary publishing.
+
+---
+
+## Product Direction
+
+`mise-db` should be treated as:
 
 ```text
-postgres 18 -> latest available 18.x, for example 18.4
-mysql 8.4   -> latest available 8.4.x
-valkey 9    -> latest available 9.x
+A mise backend plugin that installs versioned database command wrappers backed by OCI images.
 ```
 
-The plugin must publish and install exact upstream versions. Do not publish fake major-only versions such as `18` or `8`.
+Mise is responsible for:
 
-Good available versions:
+- version selection;
+- installing wrapper files;
+- activation through `PATH` and environment variables;
+- per-tool options such as `isolated`.
 
-```text
-postgres: 16.14, 17.10, 18.4
-mysql:    8.4.10, 9.4.0
-valkey:   9.1.0
-```
+The container runtime is responsible for:
 
-Bad available versions:
+- image storage;
+- image execution;
+- persistent server containers;
+- short-lived client containers;
+- container networking.
 
-```text
-postgres: 16, 17, 18
-mysql:    8, 9
-valkey:   9
-```
+Do not silently pull images during ordinary wrapper execution. Installation should pull the image. If a user later removes the image, wrappers should fail clearly and tell the user to reinstall or repull.
 
 ---
 
 ## Tool Names
 
-Use these exact tool names:
+Use these exact public tool names:
 
 ```text
 postgres
@@ -77,127 +95,97 @@ mysql
 valkey
 ```
 
-Phase 1 validates and supports:
+Only `postgres` is currently implemented. MySQL and Valkey are planned.
+
+---
+
+## PostgreSQL Wrapper Behavior
+
+Installed PostgreSQL versions provide symlinks for:
 
 ```text
 postgres
-mysql
-valkey
+pg_ctl
+psql
+pg_dump
+pg_restore
+createdb
+dropdb
+createuser
+dropuser
 ```
+
+`pg_ctl` is the lifecycle interface for the persistent PostgreSQL container:
+
+- `pg_ctl start` creates the container if missing, starts it, and waits for Docker health to become `healthy`.
+- `pg_ctl stop` stops and removes the container while preserving the data directory.
+- `pg_ctl status` reports the managed container status and returns success only when the container is running and healthy.
+- `pg_ctl restart` stops then starts.
+- `pg_ctl reload` executes PostgreSQL reload inside the running container.
+
+`postgres` starts the managed server and follows its logs.
+
+Client commands such as `psql`, `pg_dump`, and `pg_restore` run in short-lived containers attached to the shared Docker network.
 
 ---
 
-## Supported Platforms
+## Runtime Model
 
-Phase 1 required targets:
+The current runtime is Docker.
+
+The shared network name is:
 
 ```text
-linux-amd64
-linux-arm64
-darwin-amd64
-darwin-arm64
+mise-db
 ```
 
-Do not implement musl/Alpine or Windows in v0.1.
-
----
-
-## GitHub Release Asset Naming
-
-Database binaries must be uploaded to GitHub Releases using this naming scheme:
+The persistent container name is deterministic:
 
 ```text
-<tool>-<version>-<target>.tar.xz
-<tool>-<version>-<target>.tar.xz.sha256
+mise-db-<tool>-<version-tag>-<instance>
 ```
 
 Examples:
 
 ```text
-postgres-18.4-linux-amd64.tar.xz
-postgres-18.4-linux-arm64.tar.xz
-postgres-18.4-darwin-amd64.tar.xz
-postgres-18.4-darwin-arm64.tar.xz
-mysql-8.4.10-linux-amd64.tar.xz
-valkey-9.1.0-linux-arm64.tar.xz
+mise-db-postgres-18-4-global
+mise-db-postgres-18-4-myapp-0abc
 ```
 
-GitHub Release tags should use:
+The data directory is:
 
 ```text
-<tool>-<version>
+${XDG_DATA_HOME:-$HOME/.local/share}/mise-db/<tool>/<version>/<instance>
 ```
 
-Examples:
+Global mode uses:
 
 ```text
-postgres-18.4
-mysql-8.4.10
-valkey-9.1.0
+global
 ```
 
-Direct public URL shape:
-
-```text
-https://github.com/lcmen/mise-db/releases/download/<tool>-<version>/<tool>-<version>-<target>.tar.xz
-```
-
-While the repository is private, the plugin may download release assets through the GitHub Releases API with `GH_TOKEN`.
+Isolated mode derives an instance name from the project root slug plus a small checksum.
 
 ---
 
-## Database Archive Layout
+## Manifest
 
-Each database binary archive should extract directly into the mise install directory and should have this general structure:
-
-```text
-bin/
-lib/
-share/
-licenses/
-```
-
-PostgreSQL archive should include at least:
+`BackendInstall` writes a manifest into the mise install path:
 
 ```text
-bin/postgres
-bin/pg_ctl
-bin/initdb
-bin/psql
-bin/createdb
-bin/dropdb
-bin/createuser
-bin/dropuser
+TOOL=postgres
+VERSION=18.4
+IMAGE=postgres:18.4-alpine
+ISOLATED=true
 ```
 
-MySQL archive should include at least:
-
-```text
-bin/mysqld
-bin/mysql
-bin/mysqladmin
-bin/mysqldump
-```
-
-Valkey archive should include at least:
-
-```text
-bin/valkey-server
-bin/valkey-cli
-```
-
-For drop-in Redis compatibility, Valkey archives should also include:
-
-```text
-bin/redis-server
-bin/redis-cli
-```
-
-`licenses/` should contain upstream license files copied by CI from the downloaded source or official binary package. Do not manually maintain upstream database license files in the repo root.
+Installed wrappers must use the copied manifest and wrapper files inside the versioned mise install directory. Do not symlink installed commands back to the plugin checkout.
 
 ---
 
 ## Repository Structure
+
+Current structure:
 
 ```text
 metadata.lua
@@ -207,292 +195,81 @@ hooks/
   backend_list_versions.lua
   backend_install.lua
   backend_exec_env.lua
-ci/
-  builders/
-    darwin.sh
-    linux.sh
-  tools/
-    mysql.sh
-    postgres.sh
-    valkey.sh
-  targets.json
-  tools.json
-  released.sh
-  utils.sh
-.github/
-  workflows/
-    build.yml
-    rebuild.yml
+wrappers/
+  postgres
+  lib/
+    context.sh
+    dockers.sh
+tests/
+  postgres.test.sh
 README.md
 AGENTS.md
+mise-db-container-wrappers-plan.md
 ```
 
 Add helper scripts only when needed. Keep the implementation small and understandable.
 
 ---
 
-## mise Backend Plugin Requirements
-
-This must be implemented as a **mise backend plugin**, not as an asdf plugin.
-
-Use the `db:<tool>` form:
-
-```toml
-[tools]
-"db:postgres" = "18"
-"db:mysql" = "8.4"
-"db:valkey" = "9"
-```
-
-The plugin should implement at least these hooks:
-
-```text
-BackendListVersions
-BackendInstall
-BackendExecEnv
-```
-
-### `BackendListVersions`
-
-- Validate `ctx.tool`.
-- Query GitHub Releases for `lcmen/mise-db`.
-- Filter release tags by `<tool>-<version>`.
-- Return concrete versions only.
-- Sort versions oldest to newest so mise can resolve partial versions correctly.
-- Ignore prereleases unless explicitly requested later.
-
-### `BackendInstall`
-
-- Validate tool name.
-- Detect OS and architecture.
-- Support Ubuntu-compatible Linux and macOS targets listed above.
-- Find the matching release asset named `<tool>-<version>-<target>.tar.xz`.
-- Download the `.tar.xz` archive.
-- Extract the archive into `ctx.install_path`.
-- Ensure installed binaries are executable.
-- Fail with a clear error if the platform or tool is unsupported.
-
-### `BackendExecEnv`
-
-- Add `<install_path>/bin` to `PATH`.
-- Do not start services automatically.
-
-This plugin provides binaries only. It does not manage data directories, ports, service supervision, initialization, users, passwords, or migrations.
-
----
-
-## CI Build Strategy
-
-GitHub Actions should build or repackage database binaries and publish them as GitHub Release assets.
-
-### PostgreSQL
-
-Compile from source in CI through `ci/tools/postgres.sh build`. The script uses:
-
-```bash
-VERSION=18.4 TARGET=ubuntu24-amd64 ci/tools/postgres.sh build
-```
-
-Internally it downloads PostgreSQL source, extracts it into `src/`, installs into `prefix/`, then packaging writes:
-
-```text
-dist/postgres-<version>-<target>.tar.xz
-dist/postgres-<version>-<target>.tar.xz.sha256
-```
-
-PostgreSQL configure options:
-
-```bash
-./configure --prefix="$PREFIX" --with-openssl --with-icu --with-libxml --with-libxslt
-make -j"$(cpu_count)"
-make install
-```
-
-### MySQL
-
-For v0.1, prefer repackaging official MySQL Community generic archives instead of compiling MySQL from source.
-
-### Valkey
-
-Build Valkey from source in CI through `ci/tools/valkey.sh build`. Keep the public tool name `valkey`, and include Redis-compatible command names (`redis-server` and `redis-cli`) in the archive for drop-in compatibility.
-
----
-
-## GitHub Actions Workflow Requirements
-
-Manual workflows are enough for v0.1.
-
-Required workflow permissions:
-
-```yaml
-permissions:
-  contents: write
-```
-
-The normal workflow is:
-
-```text
-.github/workflows/build.yml
-```
-
-It reads tool/version pairs from:
-
-```text
-ci/tools.json
-ci/targets.json
-```
-
-and builds each tool/version pair for every supported target. Existing complete release assets are skipped when both the archive and `.sha256` already exist.
-
-The force rebuild workflow is:
-
-```text
-.github/workflows/rebuild.yml
-```
-
-It accepts `tool` and `version` inputs and rebuilds/re-uploads that pair for every supported target.
-
-Both workflows should:
-
-1. Check out the repo.
-2. Install platform dependencies through `ci/builders/linux.sh setup` or `ci/builders/darwin.sh setup`.
-3. Build or repackage the selected tool/version through `ci/tools/<tool>.sh build`.
-4. Package the result into `dist/<tool>-<version>-<target>.tar.xz`.
-5. Generate a `.sha256` file.
-6. Verify the archive through `ci/tools/<tool>.sh verify`.
-7. Create or update the GitHub Release `<tool>-<version>` and upload assets with `--clobber`.
-
----
-
-## Verification
-
-`ci/tools/<tool>.sh verify` should extract a generated archive into a temporary directory and run version commands.
-
-PostgreSQL verification:
-
-```bash
-VERSION=18.4 TARGET=ubuntu24-amd64 ci/tools/postgres.sh verify
-```
-
-That command runs `bin/postgres --version`, `bin/psql --version`, and `bin/initdb --version`.
-
-Verification should not start persistent services or require privileged access.
-
----
-
-## README Requirements
-
-Create a `README.md` explaining:
-
-- What `mise-db` is.
-- How to install the plugin as `db`.
-- Example `mise.toml` usage.
-- Supported tools.
-- Supported platforms.
-- That it installs binaries only and does not manage services.
-- Where database binaries are hosted.
-- How to run a manual GitHub Actions build.
-- How version resolution works.
-
-Include this example:
-
-```toml
-[tools]
-"db:postgres" = "18"
-```
-
-Also include exact-version examples:
-
-```toml
-[tools]
-"db:postgres" = "18.4"
-```
-
----
-
-## Version Discovery
-
-Manual builds are enough for v0.1. If implementing discovery later:
-
-- Discover latest supported PostgreSQL versions from official PostgreSQL release/source listings.
-- Discover latest MySQL Community versions from official MySQL downloads/release metadata where practical.
-- Discover latest Valkey versions from upstream release metadata.
-- Keep only the latest 4 relevant release lines per tool.
-- Do not trigger builds for assets that already exist in GitHub Releases.
-
-Discovery should be conservative. Prefer no automatic build over publishing the wrong version.
-
----
-
-## Licensing Policy
-
-Do not commit generated database binaries into git.
-
-Do not manually copy upstream database license files into the repo root.
-
-CI should copy upstream license files into generated database binary archives under:
-
-```text
-licenses/<tool>/
-```
-
-The repository root license should only describe the license for the `db` plugin/build scripts themselves.
-
----
-
-## Portability Notes
-
-Linux v0.1 targets are built and verified on GitHub-hosted Ubuntu runners.
-
-Be explicit in docs that v0.1 supports Ubuntu-compatible Linux and macOS. Other Linux distributions may work if compatible runtime libraries are available, but are not guaranteed. Alpine/musl is not supported.
-
-Prefer bundling required shared libraries when practical, but do not overcomplicate v0.1. At minimum, verify the generated archive on the GitHub runner where it was built.
-
-Future improvements:
-
-- Add RPATH/patchelf handling for bundled shared libraries.
-- Add musl targets only if there is clear demand.
-
----
-
 ## Coding Style
 
-- Keep scripts POSIX-ish where practical, but Bash is acceptable.
-- Use `set -euo pipefail` in shell scripts.
+- Bash scripts must use `set -euo pipefail`.
 - Validate inputs early.
 - Fail with clear error messages.
-- Avoid hidden global state.
-- Prefer small scripts over one large script.
-- Do not add unrelated dependencies.
-- Do not introduce service-management behavior into the mise plugin.
+- Prefer explicit function arguments over hidden globals in shared helpers.
+- Keep functions in `wrappers/lib/context.sh` and `wrappers/lib/dockers.sh` sorted alphabetically by function name.
+- Use uppercase readonly variables for wrapper-level constants such as `LIBEXEC_DIR`, `INSTALL_DIR`, `CONTAINER`, and `NETWORK`.
+- It is acceptable to use a file-level shellcheck disable for deliberate wrapper patterns, such as dynamic `source` paths or one-line readonly command substitutions.
+- Prefer small, focused shell helpers over one large dispatch script.
+- Do not introduce unrelated dependencies.
 
 ---
 
-## Security and Integrity
+## Testing
 
-- Generate SHA256 checksum files for every archive.
-- Plugin-side checksum verification can be added later.
-- Do not execute downloaded files during installation except for optional local verification in CI.
-- Use HTTPS URLs only.
-- Avoid curl-pipe-shell patterns.
+Run static checks:
 
----
-
-## Non-Goals for v0.1
-
-Do not implement these in the first version:
-
-- Database service supervisor.
-- Automatic `initdb` / MySQL data directory initialization.
-- Automatic port allocation.
-- Worktree-specific database names.
-- musl/Alpine builds.
-- Source-built MySQL.
-- Windows builds.
-- Docker images.
-
-This repository should remain focused on one thing:
-
-```text
-Install prebuilt database binaries through mise.
+```bash
+bash -n wrappers/postgres wrappers/lib/context.sh wrappers/lib/dockers.sh tests/postgres.test.sh
+shellcheck wrappers/postgres wrappers/lib/dockers.sh tests/postgres.test.sh
 ```
+
+Run the Docker smoke test:
+
+```bash
+tests/postgres.test.sh
+```
+
+The smoke test creates a temporary mise install layout under `/tmp`, starts PostgreSQL, checks `pg_ctl status`, runs `select 1 as ok`, stops the container, and prints the temp directory.
+
+---
+
+## Future Work
+
+Follow the plan in `mise-db-container-wrappers-plan.md` unless the user explicitly redirects the project.
+
+Near-term priorities:
+
+1. Improve PostgreSQL wrapper coverage.
+2. Add data safety checks.
+3. Improve `BackendExecEnv` so wrapper naming and activation naming match.
+4. Add host DNS integration.
+5. Add Apple `container` support.
+6. Add MySQL and Valkey wrappers.
+
+---
+
+## Non-Goals For The Current MVP
+
+Do not implement these unless explicitly requested:
+
+- native database binary build CI;
+- GitHub Release database binary assets;
+- Windows support;
+- musl/Alpine host support claims;
+- source-built MySQL;
+- automatic database migrations;
+- automatic application database creation;
+- automatic port allocation;
+- deleting persistent database data on uninstall;
+- service supervision outside the managed container lifecycle.

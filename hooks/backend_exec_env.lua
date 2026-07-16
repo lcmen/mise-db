@@ -4,9 +4,12 @@ function PLUGIN:BackendExecEnv(ctx)
     common.validate_tool(ctx.tool)
 
     local file = require("file")
+
     return {
         env_vars = {
-            {key = "PATH", value = file.join_path(ctx.install_path, "bin")},
+            { key = "PATH",   value = file.join_path(ctx.install_path, "bin") },
+            { key = "PGUSER", value = "postgres" },
+            { key = "PGPASS", value = "postgres" },
         }
     }
 end
