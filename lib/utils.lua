@@ -1,26 +1,12 @@
 local M = {}
 
-M.github_repository = "lcmen/mise-db"
-M.supported_tools = {"postgres"}
-M.postgres_versions = {"16.14", "17.10", "18.4"}
+--- Tool names implemented by this plugin.
+---@type string[]
+M.supported_tools = { "postgres" }
 
--- Builds GitHub request headers, adding auth when a token is available.
-function M.github_headers(accept)
-    local token = os.getenv("GH_TOKEN")
-
-    local headers = {
-        ["Accept"] = accept or "application/vnd.github+json",
-        ["User-Agent"] = "db-mise-plugin"
-    }
-
-    if token and token ~= "" then
-        headers["Authorization"] = "Bearer " .. token
-    end
-
-    return headers
-end
-
--- Ensures only implemented tools are accepted.
+--- Ensures only implemented tools are accepted.
+---@param tool string Tool name from mise.
+---@return nil
 function M.validate_tool(tool)
     for _, supported_tool in ipairs(M.supported_tools) do
         if tool == supported_tool then
@@ -31,11 +17,17 @@ function M.validate_tool(tool)
     error("unsupported tool '" .. tostring(tool) .. "'; supported tools: " .. table.concat(M.supported_tools, ", "))
 end
 
--- Quotes a value for use as one POSIX shell argument.
+--- Quotes a value for use as one POSIX shell argument.
+---@param value any Value to quote.
+---@return string quoted Shell-quoted value.
 function M.shell_quote(value)
     return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+--- Looks up a per-tool option from known mise context containers.
+---@param ctx table Mise backend hook context.
+---@param key string Option key to read.
+---@return any value Option value, or nil when unset.
 function M.table_option(ctx, key)
     local containers = {
         ctx.options,
@@ -54,6 +46,11 @@ function M.table_option(ctx, key)
     return nil
 end
 
+--- Reads a boolean option from the mise context.
+---@param ctx table Mise backend hook context.
+---@param key string Option key to read.
+---@param default boolean Default value when unset or unrecognized.
+---@return boolean value Parsed boolean option.
 function M.boolean_option(ctx, key, default)
     local value = M.table_option(ctx, key)
     if value == nil then
@@ -68,43 +65,12 @@ function M.boolean_option(ctx, key, default)
     return default
 end
 
-function M.sanitize(value)
-    local sanitized = tostring(value):lower():gsub("[^a-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
-    if sanitized == "" then
-        return "project"
-    end
-    return sanitized
-end
-
-function M.byte_sum(value)
-    local sum = 0
-    value = tostring(value)
-    for index = 1, #value do
-        sum = (sum + value:byte(index)) % 65536
-    end
-    return sum
-end
-
-function M.project_root(ctx)
-    return ctx.project_root or ctx.project_path or os.getenv("MISE_PROJECT_ROOT") or os.getenv("PWD") or "."
-end
-
-function M.postgres_context(ctx)
-    local isolated = M.boolean_option(ctx, "isolated", false)
-    local version_token = tostring(ctx.version):gsub("[^A-Za-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
-    local instance = "global"
-
-    if isolated then
-        local root = M.project_root(ctx)
-        local slug = M.sanitize(root:match("([^/]+)$") or root)
-        instance = slug .. "-" .. string.format("%04x", M.byte_sum(root))
-    end
-
-    return {
-        isolated = isolated,
-        instance = instance,
-        container = "mise-db-postgres-" .. version_token .. "-" .. instance,
-    }
+--- Loads the metadata module for a supported tool.
+---@param tool string Tool name from mise.
+---@return table tool_module Per-tool metadata and behavior.
+function M.tool(tool)
+    M.validate_tool(tool)
+    return dofile(RUNTIME.pluginDirPath .. "/lib/" .. tool .. ".lua")
 end
 
 return M

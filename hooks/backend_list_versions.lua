@@ -1,8 +1,8 @@
 local common = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
 
 function PLUGIN:BackendListVersions(ctx)
-    common.validate_tool(ctx.tool)
+    local tool = common.tool(ctx.tool)
 
     local semver = require("semver")
-    return {versions = semver.sort(common.postgres_versions)}
+    return {versions = semver.sort(tool.list_versions())}
 end
