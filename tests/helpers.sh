@@ -31,15 +31,15 @@ install_wrapper() {
   local wrapper="${3:?wrapper name is required}"
   shift 3
 
-  mkdir -p "$install_dir/libexec/lib" "$install_dir/bin"
-  cp "$root/wrappers/$wrapper" "$install_dir/libexec/$wrapper"
-  cp -R "$root/wrappers/lib/." "$install_dir/libexec/lib"
+  mkdir -p "$install_dir/bin"
+  cp -R "$root/wrappers/lib" "$install_dir"
+  cp "$root/wrappers/$wrapper" "$install_dir/lib/$wrapper"
   chmod -R u+rwX "$install_dir"
-  find "$install_dir/libexec" -type f -exec chmod 755 {} +
+  find "$install_dir/lib" -type f -exec chmod 755 {} +
 
   local command_name
   for command_name in "$@"; do
-    ln -sf "$install_dir/libexec/$wrapper" "$install_dir/bin/$command_name"
+    ln -sf "$install_dir/lib/$wrapper" "$install_dir/bin/$command_name"
   done
 }
 
@@ -62,6 +62,10 @@ install_tool() {
 
   install_dir="$(create_dir "$tool")"
   image="${tool}:${version}-alpine"
+
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    docker pull "$image" >&2
+  fi
 
   cat >"$install_dir/manifest" <<EOF
 TOOL=$tool

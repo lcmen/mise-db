@@ -5,32 +5,29 @@ local file = require("file")
 
 local function ensure_docker()
     cmd.exec(
-        "command -v docker >/dev/null 2>&1 || { echo 'mise-db requires Docker for container-backed database wrappers.' >&2; exit 1; }")
+        "command -v docker >/dev/null 2>&1 || { echo 'mise-db requires Docker for container-backed database wrappers.' >&2; exit 1; }"
+    )
     cmd.exec(
-        "docker info >/dev/null 2>&1 || { echo 'Docker is installed but the daemon is not available.' >&2; exit 1; }")
+        "docker info >/dev/null 2>&1 || { echo 'Docker is installed but the daemon is not available.' >&2; exit 1; }"
+    )
 end
 
 local function install_wrapper(ctx, tool)
-    local bin_path = file.join_path(ctx.install_path, "bin")
-    local libexec_path = file.join_path(ctx.install_path, "libexec")
-    local install_dirs = {
-        bin_path,
-        libexec_path,
-    }
-    local installed_wrapper = file.join_path(libexec_path, tool.wrapper)
-    local wrapper_path = file.join_path(RUNTIME.pluginDirPath, "wrappers", tool.wrapper)
-    local wrapper_lib_path = file.join_path(RUNTIME.pluginDirPath, "wrappers", "lib")
+    local bin_dir = file.join_path(ctx.install_path, "bin")
+    local lib_dest_dir = file.join_path(ctx.install_path, "lib")
+    local lib_src_dir = file.join_path(RUNTIME.pluginDirPath, "wrappers", "lib")
+    local wrapper_dest_file = file.join_path(lib_dest_dir, tool.wrapper)
+    local wrapper_src_file = file.join_path(RUNTIME.pluginDirPath, "wrappers", tool.wrapper)
 
-    cmd.exec("mkdir -p " .. utils.shell_quotes(install_dirs))
-    cmd.exec("cp " .. utils.shell_quote(wrapper_path) .. " " .. utils.shell_quote(installed_wrapper))
-    cmd.exec("cp -R " ..
-        utils.shell_quote(wrapper_lib_path) .. "/. " .. utils.shell_quote(file.join_path(libexec_path, "lib")))
+    cmd.exec("mkdir -p " .. utils.shell_quote(bin_dir))
+    cmd.exec("cp -R " .. utils.shell_quotes({ lib_src_dir, ctx.install_path }))
+    cmd.exec("cp " .. utils.shell_quotes({ wrapper_src_file, wrapper_dest_file }))
     cmd.exec("chmod -R u+rwX " .. utils.shell_quote(ctx.install_path))
-    cmd.exec("find " .. utils.shell_quote(libexec_path) .. " -type f -exec chmod 755 {} +")
+    cmd.exec("find " .. utils.shell_quote(lib_dest_dir) .. " -type f -exec chmod 755 {} +")
 
     for _, bin in ipairs(tool.bins) do
-        local link = file.join_path(bin_path, bin)
-        cmd.exec("ln -sf " .. utils.shell_quote(installed_wrapper) .. " " .. utils.shell_quote(link))
+        local cmd_file = file.join_path(bin_dir, bin)
+        cmd.exec("ln -sf " .. utils.shell_quotes({ wrapper_dest_file, cmd_file }))
     end
 end
 

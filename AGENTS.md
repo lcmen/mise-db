@@ -39,9 +39,9 @@ The current implementation is a PostgreSQL-only Docker MVP.
 
 Implemented:
 
-- `BackendListVersions` returns known PostgreSQL versions.
+- `BackendListVersions` returns PostgreSQL versions discovered from Docker Hub tags via `lib/registry.lua`.
 - `BackendInstall` validates `postgres`, pulls `postgres:<version>-alpine`, copies wrappers into the mise install path, writes a manifest, and creates command symlinks.
-- `BackendExecEnv` adds the install `bin/` directory to `PATH` and sets basic PostgreSQL credentials.
+- `BackendExecEnv` adds the install `bin/` directory to `PATH`, sets basic PostgreSQL credentials, and sets `PGHOST` when `MISE_DB_CONTAINER_TLD` is configured.
 - PostgreSQL wrappers manage a persistent Docker container and short-lived client containers.
 - Docker healthchecks are used for readiness.
 - `tests/postgres.test.sh` smoke-tests the wrapper install layout with Docker.
@@ -51,9 +51,9 @@ Not implemented yet:
 - MySQL wrappers.
 - Valkey wrappers.
 - Apple `container` runtime adapter.
-- Host DNS through `devdns` or Apple Container DNS.
+- Automatic host DNS setup through `devdns` or Apple Container DNS.
 - Image digest pinning.
-- Full `BackendExecEnv` host/container naming variables.
+- Full non-PostgreSQL `BackendExecEnv` host/container naming variables.
 - Native database binary publishing.
 
 ---
@@ -190,6 +190,8 @@ Current structure:
 ```text
 metadata.lua
 lib/
+  postgres.lua
+  registry.lua
   utils.lua
 hooks/
   backend_list_versions.lua
@@ -199,12 +201,12 @@ wrappers/
   postgres
   lib/
     context.sh
-    dockers.sh
+    docker.sh
 tests/
+  helpers.sh
   postgres.test.sh
 README.md
 AGENTS.md
-mise-db-container-wrappers-plan.md
 ```
 
 Add helper scripts only when needed. Keep the implementation small and understandable.
@@ -217,8 +219,8 @@ Add helper scripts only when needed. Keep the implementation small and understan
 - Validate inputs early.
 - Fail with clear error messages.
 - Prefer explicit function arguments over hidden globals in shared helpers.
-- Keep functions in `wrappers/lib/context.sh` and `wrappers/lib/dockers.sh` sorted alphabetically by function name.
-- Use uppercase readonly variables for wrapper-level constants such as `LIBEXEC_DIR`, `INSTALL_DIR`, `CONTAINER`, and `NETWORK`.
+- Keep functions in `wrappers/lib/context.sh` and `wrappers/lib/docker.sh` sorted alphabetically by function name.
+- Use uppercase readonly variables for wrapper-level constants such as `LIB_DIR`, `INSTALL_DIR`, `CONTAINER`, and `NETWORK`.
 - It is acceptable to use a file-level shellcheck disable for deliberate wrapper patterns, such as dynamic `source` paths or one-line readonly command substitutions.
 - Prefer small, focused shell helpers over one large dispatch script.
 - Do not introduce unrelated dependencies.
@@ -230,8 +232,8 @@ Add helper scripts only when needed. Keep the implementation small and understan
 Run static checks:
 
 ```bash
-bash -n wrappers/postgres wrappers/lib/context.sh wrappers/lib/dockers.sh tests/postgres.test.sh
-shellcheck wrappers/postgres wrappers/lib/dockers.sh tests/postgres.test.sh
+bash -n wrappers/postgres wrappers/lib/context.sh wrappers/lib/docker.sh tests/postgres.test.sh
+shellcheck wrappers/postgres wrappers/lib/docker.sh tests/postgres.test.sh
 ```
 
 Run the Docker smoke test:
@@ -246,13 +248,11 @@ The smoke test creates a temporary mise install layout under `/tmp`, starts Post
 
 ## Future Work
 
-Follow the plan in `mise-db-container-wrappers-plan.md` unless the user explicitly redirects the project.
-
 Near-term priorities:
 
 1. Improve PostgreSQL wrapper coverage.
 2. Add data safety checks.
-3. Improve `BackendExecEnv` so wrapper naming and activation naming match.
+3. Expand `BackendExecEnv` conventions for future MySQL and Valkey support.
 4. Add host DNS integration.
 5. Add Apple `container` support.
 6. Add MySQL and Valkey wrappers.

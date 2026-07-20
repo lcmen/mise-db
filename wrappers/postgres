@@ -16,8 +16,8 @@ while [[ -L "$script_path" ]]; do
   fi
 done
 
-readonly LIBEXEC_DIR="$(CDPATH='' cd -- "$(dirname -- "$script_path")" && pwd)"
-readonly INSTALL_DIR="$(CDPATH='' cd -- "$LIBEXEC_DIR/.." && pwd)"
+readonly LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "$script_path")" && pwd)"
+readonly INSTALL_DIR="$(CDPATH='' cd -- "$LIB_DIR/.." && pwd)"
 
 if [[ ! -f "$INSTALL_DIR/manifest" ]]; then
   echo "mise-db manifest not found: $INSTALL_DIR/manifest" >&2
@@ -25,8 +25,8 @@ if [[ ! -f "$INSTALL_DIR/manifest" ]]; then
 fi
 
 source "$INSTALL_DIR/manifest"
-source "$LIBEXEC_DIR/lib/context.sh"
-source "$LIBEXEC_DIR/lib/dockers.sh"
+source "$LIB_DIR/context.sh"
+source "$LIB_DIR/docker.sh"
 
 readonly CONTAINER="$(container_name)"
 readonly NETWORK="mise-db"
