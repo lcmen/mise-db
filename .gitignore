@@ -33,6 +33,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+mise.toml
 
 # OS junk
 .DS_Store
