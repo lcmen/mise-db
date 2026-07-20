@@ -1,7 +1,7 @@
-local common = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
+local utils = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
 
 function PLUGIN:BackendExecEnv(ctx)
-    local tool = common.tool(ctx.tool)
+    local tool = utils.tool(ctx.tool)
 
     local file = require("file")
     local env_vars = {

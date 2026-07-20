@@ -35,6 +35,17 @@ function M.shell_quote(value)
     return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+--- Quotes multiple values for use as POSIX shell arguments.
+---@param values any[] Values to quote.
+---@return string quoted Shell-quoted values separated by spaces.
+function M.shell_quotes(values)
+    local quoted = {}
+    for _, value in ipairs(values) do
+        table.insert(quoted, M.shell_quote(value))
+    end
+    return table.concat(quoted, " ")
+end
+
 --- Looks up a per-tool option from known mise context containers.
 ---@param ctx table Mise backend hook context.
 ---@param key string Option key to read.
