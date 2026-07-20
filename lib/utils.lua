@@ -4,6 +4,17 @@ local M = {}
 ---@type string[]
 M.supported_tools = { "postgres" }
 
+--- Computes a small deterministic checksum for a string.
+---@param value string Input string.
+---@return number checksum Decimal checksum in the range 0..65535.
+function M.byte_sum(value)
+    local sum = 0
+    for i = 1, #value do
+        sum = (sum + string.byte(value, i)) % 65536
+    end
+    return sum
+end
+
 --- Ensures only implemented tools are accepted.
 ---@param tool string Tool name from mise.
 ---@return nil
@@ -46,6 +57,15 @@ function M.table_option(ctx, key)
     return nil
 end
 
+--- Builds the deterministic Docker container name.
+---@param tool string Tool name.
+---@param version string Tool version.
+---@param isolated boolean Whether project isolation is enabled.
+---@return string container Container name.
+function M.container_name(tool, version, isolated)
+    return "mise-db-" .. tool .. "-" .. M.version_tag(version) .. "-" .. M.instance_name(isolated)
+end
+
 --- Reads a boolean option from the mise context.
 ---@param ctx table Mise backend hook context.
 ---@param key string Option key to read.
@@ -65,12 +85,65 @@ function M.boolean_option(ctx, key, default)
     return default
 end
 
+--- Builds the instance identity for global or isolated mode.
+---@param isolated boolean Whether project isolation is enabled.
+---@return string instance "global" or "<project-slug>-<path-checksum>".
+function M.instance_name(isolated)
+    if isolated then
+        local root = M.project_root()
+        local slug = M.sanitize(M.basename(root))
+        return string.format("%s-%04x", slug, M.byte_sum(root))
+    end
+
+    return "global"
+end
+
+--- Returns the final path segment.
+---@param path string Path.
+---@return string name Base name.
+function M.basename(path)
+    local value = tostring(path):gsub("/+$", "")
+    return value:match("([^/]+)$") or value
+end
+
+--- Finds the current project root used for isolated identities.
+---@return string root Project root.
+function M.project_root()
+    local env_root = os.getenv("MISE_PROJECT_ROOT")
+    if env_root ~= nil and env_root ~= "" then
+        return env_root
+    end
+
+    local cmd = require("cmd")
+    local root = cmd.exec("command -v git >/dev/null 2>&1 && git rev-parse --show-toplevel 2>/dev/null || pwd -P")
+    return tostring(root):gsub("%s+$", "")
+end
+
+--- Converts arbitrary text into a lowercase slug.
+---@param value string Input string.
+---@return string slug Slug containing only lowercase letters, digits, and hyphens.
+function M.sanitize(value)
+    local slug = tostring(value or "project"):lower()
+    slug = slug:gsub("[^a-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
+    if slug == "" then
+        return "project"
+    end
+    return slug
+end
+
 --- Loads the metadata module for a supported tool.
 ---@param tool string Tool name from mise.
 ---@return table tool_module Per-tool metadata and behavior.
 function M.tool(tool)
     M.validate_tool(tool)
     return dofile(RUNTIME.pluginDirPath .. "/lib/" .. tool .. ".lua")
+end
+
+--- Converts a version string into a Docker-name-safe tag segment.
+---@param version string Version string.
+---@return string tag Sanitized version tag.
+function M.version_tag(version)
+    return tostring(version or ""):gsub("[^A-Za-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
 end
 
 return M

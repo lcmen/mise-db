@@ -8,7 +8,7 @@ function PLUGIN:BackendExecEnv(ctx)
         { key = "PATH", value = file.join_path(ctx.install_path, "bin") },
     }
 
-    for _, env_var in ipairs(tool.exec_env()) do
+    for _, env_var in ipairs(tool.exec_env(ctx)) do
         table.insert(env_vars, env_var)
     end
 

@@ -61,6 +61,34 @@ mise use 'db:postgres@18.4[isolated=true]'
 
 This lets different projects use the same PostgreSQL version without sharing the same container or data directory.
 
+## Hostnames For Applications
+
+By default, wrappers connect through Docker's shared `mise-db` network and no database container host is exposed to applications. To expose stable container hostnames, run a DNS service such as [`devdns`](https://github.com/lcmen/devdns) and configure the container TLD globally:
+
+```toml
+# ~/.config/mise/config.toml
+[env]
+MISE_DB_CONTAINER_TLD = "container"
+```
+
+When `MISE_DB_CONTAINER_TLD` is available to mise, activation exports the database host using the tool's environment convention:
+
+```text
+PGHOST=mise-db-postgres-18-4-myapp-0abc.container
+```
+
+Rails can then use the activated environment:
+
+```yaml
+development:
+  adapter: postgresql
+  host: <%= ENV.fetch("PGHOST") %>
+  username: <%= ENV.fetch("PGUSER", "postgres") %>
+  password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
+```
+
+DNS must resolve the generated hostname to an address reachable from the host. On Docker Desktop for macOS, container IPs may need additional networking support.
+
 ## Data Storage
 
 Database files are stored outside the mise install directory:
