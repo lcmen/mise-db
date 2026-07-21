@@ -43,12 +43,44 @@ install_wrapper() {
   done
 }
 
+adapter_available() {
+  local adapter="${1:?adapter is required}"
+
+  case "$adapter" in
+    apple)
+      command -v container >/dev/null 2>&1 && container system status >/dev/null 2>&1
+      ;;
+    docker)
+      command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
+      ;;
+    *)
+      echo "unsupported test adapter: $adapter" >&2
+      return 2
+      ;;
+  esac
+}
+
+adapter_pull() {
+  local adapter="${1:?adapter is required}"
+  local image="${2:?image is required}"
+
+  case "$adapter" in
+    apple)
+      container image inspect "$image" >/dev/null 2>&1 || container image pull "$image" >&2
+      ;;
+    docker)
+      docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image" >&2
+      ;;
+  esac
+}
+
 #######################################
 # Creates a temporary install directory and writes its manifest.
 # Arguments:
 #   $1: Tool name.
 #   $2: Tool version.
 #   $3: Isolated mode, true or false.
+#   $4: Adapter, docker or apple.
 # Outputs:
 #   Temporary install directory path.
 # Returns:
@@ -58,20 +90,20 @@ install_tool() {
   local tool="${1:?tool is required}"
   local version="${2:?version is required}"
   local isolated="${3:?isolated is required}"
+  local adapter="${4:?adapter is required}"
   local install_dir image
 
   install_dir="$(create_dir "$tool")"
   image="${tool}:${version}-alpine"
 
-  if ! docker image inspect "$image" >/dev/null 2>&1; then
-    docker pull "$image" >&2
-  fi
+  adapter_pull "$adapter" "$image"
 
   cat >"$install_dir/manifest" <<EOF
 TOOL=$tool
 VERSION=$version
 IMAGE=$image
 ISOLATED=$isolated
+ADAPTER=$adapter
 EOF
 
   printf '%s\n' "$install_dir"
@@ -89,5 +121,6 @@ run() {
   local install_dir="${1:?install dir is required}"
   shift
 
-  MISE_PROJECT_ROOT="$install_dir" XDG_DATA_HOME="$install_dir/data" "$@"
+  MISE_PROJECT_ROOT="$install_dir" XDG_DATA_HOME="$install_dir/data" \
+    PGUSER=postgres PGPASSWORD=postgres "$@"
 }

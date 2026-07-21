@@ -4,6 +4,14 @@ local M = {}
 ---@type string[]
 M.supported_tools = { "postgres" }
 
+local function adapter_available(adapter)
+    if adapter == "apple" then
+        return "command -v container >/dev/null 2>&1 && container system status >/dev/null 2>&1"
+    end
+
+    return "command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1"
+end
+
 --- Computes a small deterministic checksum for a string.
 ---@param value string Input string.
 ---@return number checksum Decimal checksum in the range 0..65535.
@@ -94,6 +102,26 @@ function M.boolean_option(ctx, key, default)
         return false
     end
     return default
+end
+
+--- Resolves the runtime adapter for an installation.
+---@return string adapter "apple" or "docker"
+function M.resolve_adapter()
+    local cmd = require("cmd")
+    local requested = os.getenv("MISE_DB_ADAPTER")
+
+    if requested ~= nil and requested ~= "" then
+        if requested ~= "apple" and requested ~= "docker" then
+            error("invalid MISE_DB_ADAPTER '" .. requested .. "'; expected docker or apple")
+        end
+
+        cmd.exec(adapter_available(requested) .. " || { echo 'mise-db adapter " .. requested .. " is not available.' >&2; exit 1; }")
+        return requested
+    end
+
+    return cmd.exec("if " .. adapter_available("apple") .. "; then printf apple; "
+        .. "elif " .. adapter_available("docker") .. "; then printf docker; "
+        .. "else echo 'mise-db requires a running Apple Container service or Docker daemon.' >&2; exit 1; fi")
 end
 
 --- Builds the instance identity for global or isolated mode.

@@ -115,13 +115,13 @@ container_status() {
 }
 
 #######################################
-# Selects Docker TTY flags for the current stdin/stdout state.
+# Selects container-runtime TTY flags for the current stdin/stdout state.
 # Outputs:
 #   "-it" for interactive terminal use, otherwise "-i".
 # Returns:
 #   0.
 #######################################
-docker_tty_args() {
+container_tty_args() {
   if [[ -t 0 && -t 1 ]]; then
     printf '%s\n' -it
   else
@@ -160,13 +160,19 @@ ensure_network() {
 }
 
 #######################################
-# Verifies that Docker CLI and daemon are available.
+# Verifies the selected adapter is Docker and that its CLI and daemon are available.
 # Returns:
 #   0 when Docker is usable; exits with an error otherwise.
 #######################################
-require_docker() {
+require_adapter() {
+  if [[ -n "${MISE_DB_ADAPTER:-}" && "$MISE_DB_ADAPTER" != "$ADAPTER" ]]; then
+    echo "mise-db install uses adapter $ADAPTER, but MISE_DB_ADAPTER requests $MISE_DB_ADAPTER." >&2
+    echo "Run MISE_DB_ADAPTER=$MISE_DB_ADAPTER mise install --force db:postgres@$VERSION to reinstall with the intended adapter." >&2
+    exit 1
+  fi
+
   if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker is required for mise-db wrappers." >&2
+    echo "Docker is required for this mise-db installation." >&2
     exit 1
   fi
   if ! docker info >/dev/null 2>&1; then
