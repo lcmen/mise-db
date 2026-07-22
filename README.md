@@ -55,7 +55,7 @@ Thanks to thin wrappers, all commands can be executed like native ones:
 
 ```bash
 pg_ctl start
-psql -d postgres
+psql
 pg_ctl stop
 ```
 
@@ -121,7 +121,7 @@ development:
   adapter: postgresql
   host: <%= ENV.fetch("PGHOST") %>
   username: <%= ENV.fetch("PGUSER", "postgres") %>
-  password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
+  password: <%= ENV.fetch("PGPASS", "postgres") %>
 ```
 
 DNS must resolve the generated hostname to an address reachable from the host. Apple Container's DNS domain is managed with `container system dns`; Docker users need a DNS service such as [`devdns`](https://github.com/lcmen/devdns), and Docker Desktop for macOS may need additional networking support for direct container IP access.
@@ -147,6 +147,8 @@ mise-db
 ```
 
 `pg_ctl start` creates a persistent container and waits until PostgreSQL is ready before returning. Docker uses a container healthcheck; Apple Container polls `pg_isready` inside the managed container.
+
+Docker client commands run in short-lived containers on the shared network. Apple Container client commands run with `container exec` inside the managed PostgreSQL container because separate Apple client containers may not be able to reach the server container over the shared network.
 
 If the selected runtime removes the image later, wrappers fail with a clear message. Run `mise install --force db:postgres@18.4` to pull the image back.
 

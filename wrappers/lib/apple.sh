@@ -121,10 +121,10 @@ container_status() {
 #   0.
 #######################################
 container_tty_args() {
-  if [[ -t 0 && -t 1 ]]; then
-    printf '%s\n' -it
+  if [[ -t 0 ]]; then
+    printf '%s' -it
   else
-    printf '%s\n' -i
+    printf '%s' -i
   fi
 }
 

@@ -35,8 +35,8 @@ function M.exec_env(ctx)
     local isolated = utils.boolean_option(ctx, "isolated", false)
     local container = utils.container_name("postgres", ctx.version, isolated)
     local env_vars = {
+        { key = "PGPASS", value = "postgres" },
         { key = "PGUSER", value = "postgres" },
-        { key = "PGPASSWORD", value = "postgres" },
     }
 
     local container_tld = os.getenv("MISE_DB_CONTAINER_TLD")

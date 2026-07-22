@@ -3,6 +3,10 @@ local utils = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
 local cmd = require("cmd")
 local file = require("file")
 
+--- Copies wrapper support files into the mise install path and creates command symlinks.
+---@param ctx table Mise backend hook context.
+---@param tool table Tool metadata, including wrapper and bin names.
+---@return nil
 local function install_wrapper(ctx, tool)
     local bin_dir = file.join_path(ctx.install_path, "bin")
     local lib_dest_dir = file.join_path(ctx.install_path, "lib")
@@ -22,6 +26,10 @@ local function install_wrapper(ctx, tool)
     end
 end
 
+--- Pulls the selected OCI image with the adapter chosen for this installation.
+---@param image string OCI image reference to pull.
+---@param resolved_adapter string Runtime adapter, either "apple" or "docker".
+---@return nil
 local function pull_image(image, resolved_adapter)
     local pull_command
 
@@ -37,6 +45,12 @@ local function pull_image(image, resolved_adapter)
     cmd.exec("printf '%s\n' " .. utils.shell_quote("mise-db: pulled " .. image) .. " >&2")
 end
 
+--- Writes the wrapper manifest consumed by installed command symlinks.
+---@param ctx table Mise backend hook context.
+---@param image string OCI image reference persisted for wrapper execution.
+---@param isolated boolean Whether this install uses project-isolated instances.
+---@param resolved_adapter string Runtime adapter persisted for wrapper execution.
+---@return nil
 local function write_manifest(ctx, image, isolated, resolved_adapter)
     local manifest = file.join_path(ctx.install_path, "manifest")
     local manifest_file = assert(io.open(manifest, "w"))

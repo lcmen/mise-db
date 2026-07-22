@@ -12,7 +12,7 @@ cleanup() {
   local adapter="${1}"
   local install_dir
   for install_dir in "${INSTALL_DIRS[@]:-}"; do
-    PGUSER=postgres PGPASSWORD=postgres run "$adapter" "$install_dir" "$install_dir/bin/pg_ctl" stop >/dev/null 2>&1 || true
+    PGPASS=postgres PGUSER=postgres run "$adapter" "$install_dir" "$install_dir/bin/pg_ctl" stop >/dev/null 2>&1 || true
   done
 }
 
@@ -38,9 +38,9 @@ service_test() {
   INSTALL_DIRS+=("$install_dir")
   install_wrapper "$ROOT_DIR" "$install_dir" postgres pg_ctl psql
 
-  PGUSER=postgres PGPASSWORD=postgres run "$adapter" "$install_dir" "$install_dir/bin/pg_ctl" start
-  PGUSER=postgres PGPASSWORD=postgres run "$adapter" "$install_dir" "$install_dir/bin/pg_ctl" status
-  PGUSER=postgres PGPASSWORD=postgres run "$adapter" "$install_dir" "$install_dir/bin/psql" -d postgres -c 'select 1 as ok;'
+  PGPASS=postgres PGUSER=postgres run "$adapter" "$install_dir" "$install_dir/bin/pg_ctl" start
+  PGPASS=postgres PGUSER=postgres run "$adapter" "$install_dir" "$install_dir/bin/pg_ctl" status
+  PGPASS=postgres PGUSER=postgres run "$adapter" "$install_dir" "$install_dir/bin/psql" -c 'select 1 as ok;'
 }
 
 for adapter in "${ADAPTERS[@]}"; do

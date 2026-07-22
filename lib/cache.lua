@@ -4,11 +4,38 @@ local json = require("json")
 
 local CACHE_TTL_SECONDS = 24 * 60 * 60
 
+local shell_quote
+
 --- Quotes a value for use as one POSIX shell argument.
 ---@param value any Value to quote.
 ---@return string quoted Shell-quoted value.
-local function shell_quote(value)
+function shell_quote(value)
     return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
+--- Returns a cached value or executes a callback and caches its result.
+---@param name string Cache file name.
+---@param callback fun(): table Callback that produces a fresh cache value.
+---@return table value Cached or fresh value.
+function M.caching(name, callback)
+    if not M.enabled() then
+        io.stderr:write("mise-db: registry cache disabled; fetching data from Docker Hub...\n")
+        return callback()
+    end
+
+    local path = M.file(name)
+    if M.path_exists(path) and M.fresh(path) then
+        local value = M.read_json(path)
+        if value ~= nil then
+            io.stderr:write("mise-db: using cached registry data from " .. path .. "\n")
+            return value
+        end
+    end
+
+    io.stderr:write("mise-db: registry cache missing/expired; fetching data from Docker Hub...\n")
+    local value = callback()
+    M.write_json(path, value)
+    return value
 end
 
 --- Builds the mise-db cache directory path.
@@ -24,6 +51,19 @@ function M.dir()
     end
 
     return base .. "/mise-db"
+end
+
+--- Returns whether registry caching is enabled.
+---@return boolean enabled True when cache reads and writes are enabled.
+function M.enabled()
+    return os.getenv("MISE_DB_CACHE") ~= "0"
+end
+
+--- Builds a cache file path.
+---@param name string Cache file name.
+---@return string path Cache file path.
+function M.file(name)
+    return M.dir() .. "/" .. name
 end
 
 --- Returns a file's modification time.
@@ -48,19 +88,6 @@ function M.file_mtime(path)
     end
 
     return nil
-end
-
---- Returns whether registry caching is enabled.
----@return boolean enabled True when cache reads and writes are enabled.
-function M.enabled()
-    return os.getenv("MISE_DB_CACHE") ~= "0"
-end
-
---- Builds a cache file path.
----@param name string Cache file name.
----@return string path Cache file path.
-function M.file(name)
-    return M.dir() .. "/" .. name
 end
 
 --- Checks whether a cache file is younger than the cache TTL.
@@ -122,31 +149,6 @@ function M.write_json(path, value)
     file:close()
 
     os.rename(temp_file, path)
-end
-
---- Returns a cached value or executes a callback and caches its result.
----@param name string Cache file name.
----@param callback fun(): table Callback that produces a fresh cache value.
----@return table value Cached or fresh value.
-function M.caching(name, callback)
-    if not M.enabled() then
-        io.stderr:write("mise-db: registry cache disabled; fetching data from Docker Hub...\n")
-        return callback()
-    end
-
-    local path = M.file(name)
-    if M.path_exists(path) and M.fresh(path) then
-        local value = M.read_json(path)
-        if value ~= nil then
-            io.stderr:write("mise-db: using cached registry data from " .. path .. "\n")
-            return value
-        end
-    end
-
-    io.stderr:write("mise-db: registry cache missing/expired; fetching data from Docker Hub...\n")
-    local value = callback()
-    M.write_json(path, value)
-    return value
 end
 
 return M

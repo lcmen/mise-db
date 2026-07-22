@@ -28,7 +28,7 @@ source "$INSTALL_DIR/manifest"
 source "$LIB_DIR/context.sh"
 
 : "${PGUSER:?PGUSER is required}"
-: "${PGPASSWORD:?PGPASSWORD is required}"
+: "${PGPASS:?PGPASS is required}"
 
 case "${ADAPTER:-}" in
   apple)
@@ -63,8 +63,9 @@ create_server_container() {
       --name "$CONTAINER" \
       --network "$NETWORK" \
       --volume "$(data_dir):/var/lib/postgresql/data" \
+      --env POSTGRES_DB="$PGUSER" \
       --env POSTGRES_USER="$PGUSER" \
-      --env POSTGRES_PASSWORD="$PGPASSWORD" \
+      --env POSTGRES_PASSWORD="$PGPASS" \
       --env PGDATA=/var/lib/postgresql/data/pgdata \
       "$IMAGE" >/dev/null
   else
@@ -72,8 +73,9 @@ create_server_container() {
       --name "$CONTAINER" \
       --network "$NETWORK" \
       --volume "$(data_dir):/var/lib/postgresql/data" \
+      --env POSTGRES_DB="$PGUSER" \
       --env POSTGRES_USER="$PGUSER" \
-      --env POSTGRES_PASSWORD="$PGPASSWORD" \
+      --env POSTGRES_PASSWORD="$PGPASS" \
       --env PGDATA=/var/lib/postgresql/data/pgdata \
       --health-cmd "pg_isready -U $PGUSER" \
       --health-interval 1s \
@@ -169,15 +171,15 @@ run_client() {
       --network "$NETWORK" \
       --volume "$PWD:$PWD" \
       --workdir "$PWD" \
-      --env PGPASSWORD="$PGPASSWORD" \
-      "$IMAGE" "$client" "--host=$(container_ip "$CONTAINER")" --port=5432 "--username=$PGUSER" "$@"
+      --env PGPASSWORD="$PGPASS" \
+      "$IMAGE" "$client" -h "$(container_ip "$CONTAINER")" -U "$PGUSER" "$@"
   else
     docker run --rm "$(container_tty_args)" \
       --network "$NETWORK" \
       --volume "$PWD:$PWD" \
       --workdir "$PWD" \
-      --env PGPASSWORD="$PGPASSWORD" \
-      "$IMAGE" "$client" "--host=$CONTAINER" --port=5432 "--username=$PGUSER" "$@"
+      --env PGPASSWORD="$PGPASS" \
+      "$IMAGE" "$client" -h "$CONTAINER" -U "$PGUSER" "$@"
   fi
 }
 

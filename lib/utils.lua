@@ -4,6 +4,9 @@ local M = {}
 ---@type string[]
 M.supported_tools = { "postgres" }
 
+--- Builds a shell test for whether a runtime adapter is available.
+---@param adapter string Runtime adapter, either "apple" or "docker".
+---@return string command Shell command that exits successfully when available.
 local function adapter_available(adapter)
     if adapter == "apple" then
         return "command -v container >/dev/null 2>&1 && container system status >/dev/null 2>&1"
@@ -33,6 +36,33 @@ function M.arch()
     return nil
 end
 
+--- Returns the final path segment.
+---@param path string Path.
+---@return string name Base name.
+function M.basename(path)
+    local value = tostring(path):gsub("/+$", "")
+    return value:match("([^/]+)$") or value
+end
+
+--- Reads a boolean option from the mise context.
+---@param ctx table Mise backend hook context.
+---@param key string Option key to read.
+---@param default boolean Default value when unset or unrecognized.
+---@return boolean value Parsed boolean option.
+function M.boolean_option(ctx, key, default)
+    local value = M.table_option(ctx, key)
+    if value == nil then
+        return default
+    end
+    if value == true or value == "true" or value == "1" then
+        return true
+    end
+    if value == false or value == "false" or value == "0" then
+        return false
+    end
+    return default
+end
+
 --- Computes a small deterministic checksum for a string.
 ---@param value string Input string.
 ---@return number checksum Decimal checksum in the range 0..65535.
@@ -44,17 +74,71 @@ function M.byte_sum(value)
     return sum
 end
 
---- Ensures only implemented tools are accepted.
----@param tool string Tool name from mise.
----@return nil
-function M.validate_tool(tool)
-    for _, supported_tool in ipairs(M.supported_tools) do
-        if tool == supported_tool then
-            return
-        end
+--- Builds the deterministic container name.
+---@param tool string Tool name.
+---@param version string Tool version.
+---@param isolated boolean Whether project isolation is enabled.
+---@return string container Container name.
+function M.container_name(tool, version, isolated)
+    return "mise-db-" .. tool .. "-" .. M.version_tag(version) .. "-" .. M.instance_name(isolated)
+end
+
+--- Builds the instance identity for global or isolated mode.
+---@param isolated boolean Whether project isolation is enabled.
+---@return string instance "global" or "<project-slug>-<path-checksum>".
+function M.instance_name(isolated)
+    if isolated then
+        local root = M.project_root()
+        local slug = M.sanitize(M.basename(root))
+        return string.format("%s-%04x", slug, M.byte_sum(root))
     end
 
-    error("unsupported tool '" .. tostring(tool) .. "'; supported tools: " .. table.concat(M.supported_tools, ", "))
+    return "global"
+end
+
+--- Finds the current project root used for isolated identities.
+---@return string root Project root.
+function M.project_root()
+    local env_root = os.getenv("MISE_PROJECT_ROOT")
+    if env_root ~= nil and env_root ~= "" then
+        return env_root
+    end
+
+    local cmd = require("cmd")
+    local root = cmd.exec("command -v git >/dev/null 2>&1 && git rev-parse --show-toplevel 2>/dev/null || pwd -P")
+    return tostring(root):gsub("%s+$", "")
+end
+
+--- Resolves the runtime adapter for an installation.
+---@return string adapter "apple" or "docker"
+function M.resolve_adapter()
+    local cmd = require("cmd")
+    local requested = os.getenv("MISE_DB_ADAPTER")
+
+    if requested ~= nil and requested ~= "" then
+        if requested ~= "apple" and requested ~= "docker" then
+            error("invalid MISE_DB_ADAPTER '" .. requested .. "'; expected docker or apple")
+        end
+
+        cmd.exec(adapter_available(requested) .. " || { echo 'mise-db adapter " .. requested .. " is not available.' >&2; exit 1; }")
+        return requested
+    end
+
+    return cmd.exec("if " .. adapter_available("apple") .. "; then printf apple; "
+        .. "elif " .. adapter_available("docker") .. "; then printf docker; "
+        .. "else echo 'mise-db requires a running Apple Container service or Docker daemon.' >&2; exit 1; fi")
+end
+
+--- Converts arbitrary text into a lowercase slug.
+---@param value string Input string.
+---@return string slug Slug containing only lowercase letters, digits, and hyphens.
+function M.sanitize(value)
+    local slug = tostring(value or "project"):lower()
+    slug = slug:gsub("[^a-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
+    if slug == "" then
+        return "project"
+    end
+    return slug
 end
 
 --- Quotes a value for use as one POSIX shell argument.
@@ -97,106 +181,25 @@ function M.table_option(ctx, key)
     return nil
 end
 
---- Builds the deterministic Docker container name.
----@param tool string Tool name.
----@param version string Tool version.
----@param isolated boolean Whether project isolation is enabled.
----@return string container Container name.
-function M.container_name(tool, version, isolated)
-    return "mise-db-" .. tool .. "-" .. M.version_tag(version) .. "-" .. M.instance_name(isolated)
-end
-
---- Reads a boolean option from the mise context.
----@param ctx table Mise backend hook context.
----@param key string Option key to read.
----@param default boolean Default value when unset or unrecognized.
----@return boolean value Parsed boolean option.
-function M.boolean_option(ctx, key, default)
-    local value = M.table_option(ctx, key)
-    if value == nil then
-        return default
-    end
-    if value == true or value == "true" or value == "1" then
-        return true
-    end
-    if value == false or value == "false" or value == "0" then
-        return false
-    end
-    return default
-end
-
---- Resolves the runtime adapter for an installation.
----@return string adapter "apple" or "docker"
-function M.resolve_adapter()
-    local cmd = require("cmd")
-    local requested = os.getenv("MISE_DB_ADAPTER")
-
-    if requested ~= nil and requested ~= "" then
-        if requested ~= "apple" and requested ~= "docker" then
-            error("invalid MISE_DB_ADAPTER '" .. requested .. "'; expected docker or apple")
-        end
-
-        cmd.exec(adapter_available(requested) .. " || { echo 'mise-db adapter " .. requested .. " is not available.' >&2; exit 1; }")
-        return requested
-    end
-
-    return cmd.exec("if " .. adapter_available("apple") .. "; then printf apple; "
-        .. "elif " .. adapter_available("docker") .. "; then printf docker; "
-        .. "else echo 'mise-db requires a running Apple Container service or Docker daemon.' >&2; exit 1; fi")
-end
-
---- Builds the instance identity for global or isolated mode.
----@param isolated boolean Whether project isolation is enabled.
----@return string instance "global" or "<project-slug>-<path-checksum>".
-function M.instance_name(isolated)
-    if isolated then
-        local root = M.project_root()
-        local slug = M.sanitize(M.basename(root))
-        return string.format("%s-%04x", slug, M.byte_sum(root))
-    end
-
-    return "global"
-end
-
---- Returns the final path segment.
----@param path string Path.
----@return string name Base name.
-function M.basename(path)
-    local value = tostring(path):gsub("/+$", "")
-    return value:match("([^/]+)$") or value
-end
-
---- Finds the current project root used for isolated identities.
----@return string root Project root.
-function M.project_root()
-    local env_root = os.getenv("MISE_PROJECT_ROOT")
-    if env_root ~= nil and env_root ~= "" then
-        return env_root
-    end
-
-    local cmd = require("cmd")
-    local root = cmd.exec("command -v git >/dev/null 2>&1 && git rev-parse --show-toplevel 2>/dev/null || pwd -P")
-    return tostring(root):gsub("%s+$", "")
-end
-
---- Converts arbitrary text into a lowercase slug.
----@param value string Input string.
----@return string slug Slug containing only lowercase letters, digits, and hyphens.
-function M.sanitize(value)
-    local slug = tostring(value or "project"):lower()
-    slug = slug:gsub("[^a-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
-    if slug == "" then
-        return "project"
-    end
-    return slug
-end
-
 --- Loads the metadata module for a supported tool.
 ---@param tool string Tool name from mise.
 ---@return table tool_module Per-tool metadata and behavior.
 function M.tool(tool)
     M.validate_tool(tool)
     return dofile(RUNTIME.pluginDirPath .. "/lib/" .. tool .. ".lua")
+end
+
+--- Ensures only implemented tools are accepted.
+---@param tool string Tool name from mise.
+---@return nil
+function M.validate_tool(tool)
+    for _, supported_tool in ipairs(M.supported_tools) do
+        if tool == supported_tool then
+            return
+        end
+    end
+
+    error("unsupported tool '" .. tostring(tool) .. "'; supported tools: " .. table.concat(M.supported_tools, ", "))
 end
 
 --- Converts a version string into a Docker-name-safe tag segment.
