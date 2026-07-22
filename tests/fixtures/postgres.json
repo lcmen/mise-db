@@ -1,0 +1,51 @@
+[
+  {
+    "name": "11-alpine",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  },
+  {
+    "name": "12-alpine",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  },
+  {
+    "name": "13-alpine",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  },
+  {
+    "name": "18-alpine",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  },
+  {
+    "name": "18.4-alpine",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  },
+  {
+    "name": "18.4-alpine3.22",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  },
+  {
+    "name": "18-bookworm",
+    "images": [
+      { "os": "linux", "architecture": "amd64" },
+      { "os": "linux", "architecture": "arm64" }
+    ]
+  }
+]

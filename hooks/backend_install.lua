@@ -22,6 +22,21 @@ local function install_wrapper(ctx, tool)
     end
 end
 
+local function pull_image(image, resolved_adapter)
+    local pull_command
+
+    cmd.exec("printf '%s\n' " .. utils.shell_quote("mise-db: pulling " .. image .. " with " .. resolved_adapter .. "...") .. " >&2")
+
+    if resolved_adapter == "apple" then
+        pull_command = "container image pull " .. utils.shell_quote(image)
+    else
+        pull_command = "docker pull " .. utils.shell_quote(image)
+    end
+
+    cmd.exec(pull_command .. " >&2")
+    cmd.exec("printf '%s\n' " .. utils.shell_quote("mise-db: pulled " .. image) .. " >&2")
+end
+
 local function write_manifest(ctx, image, isolated, resolved_adapter)
     local manifest = file.join_path(ctx.install_path, "manifest")
     local manifest_file = assert(io.open(manifest, "w"))
@@ -40,11 +55,7 @@ function PLUGIN:BackendInstall(ctx)
     local resolved_adapter = utils.resolve_adapter()
 
     cmd.exec("mkdir -p " .. utils.shell_quote(ctx.install_path))
-    if resolved_adapter == "apple" then
-        cmd.exec("container image pull " .. utils.shell_quote(image))
-    else
-        cmd.exec("docker pull " .. utils.shell_quote(image))
-    end
+    pull_image(image, resolved_adapter)
 
     install_wrapper(ctx, tool)
     write_manifest(ctx, image, isolated, resolved_adapter)

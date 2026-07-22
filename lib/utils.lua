@@ -12,6 +12,27 @@ local function adapter_available(adapter)
     return "command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1"
 end
 
+--- Detects the current host architecture in OCI platform terms.
+---@return string|nil architecture OCI architecture, or nil when unknown.
+function M.arch()
+    local handle = io.popen("uname -m 2>/dev/null")
+    if not handle then
+        return nil
+    end
+
+    local machine = handle:read("*l")
+    handle:close()
+
+    if machine == "arm64" or machine == "aarch64" then
+        return "arm64"
+    end
+    if machine == "x86_64" or machine == "amd64" then
+        return "amd64"
+    end
+
+    return nil
+end
+
 --- Computes a small deterministic checksum for a string.
 ---@param value string Input string.
 ---@return number checksum Decimal checksum in the range 0..65535.

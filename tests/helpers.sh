@@ -16,6 +16,28 @@ create_dir() {
 }
 
 #######################################
+# Creates a temporary cache directory with registry fixtures.
+# Arguments:
+#   $1: Repository root.
+#   $2: Service name.
+# Outputs:
+#   Temporary XDG cache home path.
+# Returns:
+#   0 after the cache fixture is copied.
+#######################################
+create_cache() {
+  local root="${1:?repo root is required}"
+  local service="${2:?service is required}"
+  local cache_dir
+
+  cache_dir="$(mktemp -d "/tmp/mise-db-cache-test.XXXXXX")"
+  mkdir -p "$cache_dir/mise-db"
+  cp "$root/tests/fixtures/$service.json" "$cache_dir/mise-db/$service.json"
+
+  printf '%s\n' "$cache_dir"
+}
+
+#######################################
 # Installs a wrapper and command symlinks into a temporary install tree.
 # Arguments:
 #   $1: Repository root.
@@ -75,6 +97,38 @@ adapter_pull() {
 }
 
 #######################################
+# Asserts that stdin contains an exact line.
+# Arguments:
+#   $1: Expected line.
+# Returns:
+#   0 when stdin contains the line; exits with an error otherwise.
+#######################################
+assert() {
+  local expected="${1:?expected line is required}"
+
+  if ! grep -Fx "$expected" >/dev/null; then
+    echo "expected output to include: $expected" >&2
+    return 1
+  fi
+}
+
+#######################################
+# Refutes that stdin contains an exact line.
+# Arguments:
+#   $1: Unexpected line.
+# Returns:
+#   0 when stdin does not contain the line; exits with an error otherwise.
+#######################################
+refute() {
+  local unexpected="${1:?unexpected line is required}"
+
+  if grep -Fx "$unexpected" >/dev/null; then
+    echo "expected output to exclude: $unexpected" >&2
+    return 1
+  fi
+}
+
+#######################################
 # Creates a temporary install directory and writes its manifest.
 # Arguments:
 #   $1: Tool name.
@@ -110,17 +164,18 @@ EOF
 }
 
 #######################################
-# Runs a command with mise-db test environment variables.
+# Runs a command with mise-db test environment variables for an adapter.
 # Arguments:
-#   $1: Temporary install directory.
+#   $1: Adapter, docker or apple.
+#   $2: Temporary install directory.
 #   $@: Command and arguments to execute.
 # Returns:
 #   The wrapped command's exit status.
 #######################################
 run() {
-  local install_dir="${1:?install dir is required}"
-  shift
+  local adapter="${1:?adapter is required}"
+  local install_dir="${2:?install dir is required}"
+  shift 2
 
-  MISE_PROJECT_ROOT="$install_dir" XDG_DATA_HOME="$install_dir/data" \
-    PGUSER=postgres PGPASSWORD=postgres "$@"
+  MISE_DB_ADAPTER="$adapter" MISE_PROJECT_ROOT="$install_dir" XDG_DATA_HOME="$install_dir/data" "$@"
 }

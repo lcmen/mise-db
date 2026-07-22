@@ -167,7 +167,7 @@ ensure_network() {
 require_adapter() {
   if [[ -n "${MISE_DB_ADAPTER:-}" && "$MISE_DB_ADAPTER" != "$ADAPTER" ]]; then
     echo "mise-db install uses adapter $ADAPTER, but MISE_DB_ADAPTER requests $MISE_DB_ADAPTER." >&2
-    echo "Run MISE_DB_ADAPTER=$MISE_DB_ADAPTER mise install --force db:postgres@$VERSION to reinstall with the intended adapter." >&2
+    echo "Update mise config, then run mise install --force db:postgres@$VERSION to reinstall with the intended adapter." >&2
     exit 1
   fi
 

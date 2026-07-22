@@ -41,6 +41,14 @@ postgres:18.4-alpine
 
 and installs wrapper commands into the mise tool installation. The selected runtime adapter is recorded in that installation.
 
+Version discovery is cached for 24 hours in:
+
+```text
+${XDG_CACHE_HOME:-$HOME/.cache}/mise-db/postgres.json
+```
+
+Set `MISE_DB_CACHE=0` to bypass the registry cache for a single run.
+
 ## Use database
 
 Thanks to thin wrappers, all commands can be executed like native ones:
@@ -53,11 +61,13 @@ pg_ctl stop
 
 ## Container Runtime
 
-During `mise install`, mise-db prefers a usable Apple Container service, then a usable Docker daemon. Set `MISE_DB_ADAPTER` to choose explicitly:
+During `mise install`, mise-db prefers a usable Apple Container service, then a usable Docker daemon. Set `MISE_DB_ADAPTER` in mise config before installing to choose explicitly:
 
-```bash
-MISE_DB_ADAPTER=apple mise install db:postgres@18.4
-MISE_DB_ADAPTER=docker mise install db:postgres@18.4
+```toml
+# ~/.config/mise/config.toml
+[env]
+MISE_DB_ADAPTER = "apple"
+# MISE_DB_ADAPTER = "docker"
 ```
 
 Apple Container must be installed and started first:
@@ -69,7 +79,7 @@ container system start
 Changing `MISE_DB_ADAPTER` after installation is rejected so wrappers never mix runtimes. Force-reinstall with the intended adapter instead:
 
 ```bash
-MISE_DB_ADAPTER=apple mise install --force db:postgres@18.4
+mise install --force db:postgres@18.4
 ```
 
 ## Isolation
@@ -84,7 +94,13 @@ This lets different projects use the same PostgreSQL version without sharing the
 
 ## Hostnames For Applications
 
-By default, wrappers connect through the selected runtime's shared `mise-db` network and no database container host is exposed to applications. To expose stable container hostnames, run a DNS service such as [`devdns`](https://github.com/lcmen/devdns) and configure the container TLD globally:
+By default, wrappers connect through the selected runtime's shared `mise-db` network and no database container host is exposed to applications.
+
+To expose stable container hostnames with Apple Container, create a local DNS domain and configure the same TLD in mise:
+
+```bash
+sudo container system dns create container
+```
 
 ```toml
 # ~/.config/mise/config.toml
@@ -92,7 +108,7 @@ By default, wrappers connect through the selected runtime's shared `mise-db` net
 MISE_DB_CONTAINER_TLD = "container"
 ```
 
-When `MISE_DB_CONTAINER_TLD` is available to mise, activation exports the database host using the tool's environment convention:
+Apple Container resolves named containers as `<container-name>.<domain>`. `mise-db` creates the persistent container with a deterministic name, so when `MISE_DB_CONTAINER_TLD` is available to mise, activation exports the database host using the tool's environment convention:
 
 ```text
 PGHOST=mise-db-postgres-18-4-myapp-0abc.container
@@ -108,7 +124,7 @@ development:
   password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
 ```
 
-DNS must resolve the generated hostname to an address reachable from the host. On Docker Desktop for macOS, container IPs may need additional networking support. Apple Container DNS setup remains manual; configure its DNS domain and macOS resolver before setting `MISE_DB_CONTAINER_TLD`.
+DNS must resolve the generated hostname to an address reachable from the host. Apple Container's DNS domain is managed with `container system dns`; Docker users need a DNS service such as [`devdns`](https://github.com/lcmen/devdns), and Docker Desktop for macOS may need additional networking support for direct container IP access.
 
 ## Data Storage
 
