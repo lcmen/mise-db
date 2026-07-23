@@ -13,6 +13,6 @@ function PLUGIN:BackendExecEnv(ctx)
     end
 
     return {
-        env_vars = env_vars
+        env_vars = env_vars,
     }
 end

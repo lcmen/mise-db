@@ -1,7 +1,9 @@
 [tools]
+"aqua:Kampfkarren/selene" = "latest"
 hk = "latest"
 pkl = "latest"
 shellcheck = "latest"
+stylua = "latest"
 
 [tasks.check]
 description = "Run hk check hooks"
@@ -11,7 +13,7 @@ run = "hk check"
 description = "Run hk fix hooks"
 run = "hk fix"
 
-[tasks.hooks-install]
+[tasks.hooks]
 description = "Install hk git hooks through mise"
 run = "hk install --mise"
 

@@ -1,21 +1,29 @@
 amends "package://github.com/jdx/hk/releases/download/v1.52.0/hk@1.52.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.52.0/hk@1.52.0#/Builtins.pkl"
 
 local staticChecks = new Mapping<String, Step> {
     ["syntax"] {
         glob = "{wrappers/postgres,**/*.sh}"
         check = "bash -n {{ files }}"
     }
+    ["selene"] = Builtins.selene
     ["shellcheck"] {
         glob = "{wrappers/postgres,**/*.sh}"
         check = "shellcheck {{ files }}"
     }
+    ["stylua"] = Builtins.stylua
 }
 
 hooks {
     ["check"] {
         steps = staticChecks
     }
+    ["fix"] {
+        fix = true
+        steps = staticChecks
+    }
     ["pre-commit"] {
+        fix = true
         stash = "git"
         steps = staticChecks
     }

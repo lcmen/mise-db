@@ -4,5 +4,5 @@ function PLUGIN:BackendListVersions(ctx)
     local tool = utils.tool(ctx.tool)
 
     local semver = require("semver")
-    return {versions = semver.sort(tool.list_versions())}
+    return { versions = semver.sort(tool.list_versions()) }
 end
