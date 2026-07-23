@@ -35,22 +35,21 @@ The previous native-binary release direction has been superseded by the containe
 
 ## Current State
 
-The current implementation is a PostgreSQL-only Docker MVP.
+The current implementation is a PostgreSQL-only OCI-wrapper MVP with Docker and Apple Container adapters.
 
 Implemented:
 
-- `BackendListVersions` returns PostgreSQL versions discovered from Docker Hub tags via `lib/registry.lua`.
-- `BackendInstall` validates `postgres`, pulls `postgres:<version>-alpine`, copies wrappers into the mise install path, writes a manifest, and creates command symlinks.
+- `BackendListVersions` returns PostgreSQL versions discovered from Docker Hub tags via `lib/registry.lua`, with a 24-hour cache managed by `lib/cache.lua`. Set `MISE_DB_CACHE=0` to bypass the cache.
+- `BackendInstall` validates `postgres`, resolves an Apple Container or Docker adapter, pulls `postgres:<version>-alpine`, copies wrappers into the mise install path, writes a manifest, and creates command symlinks.
 - `BackendExecEnv` adds the install `bin/` directory to `PATH`, sets basic PostgreSQL credentials, and sets `PGHOST` when `MISE_DB_CONTAINER_TLD` is configured.
-- PostgreSQL wrappers manage a persistent Docker container and short-lived client containers.
-- Docker healthchecks are used for readiness.
-- `tests/postgres.test.sh` smoke-tests the wrapper install layout with Docker.
+- PostgreSQL wrappers manage persistent server containers and short-lived client containers through the manifest-selected adapter.
+- Docker healthchecks and Apple Container `pg_isready` polling are used for readiness.
+- `tests/postgres.test.sh` smoke-tests both adapters.
 
 Not implemented yet:
 
 - MySQL wrappers.
 - Valkey wrappers.
-- Apple `container` runtime adapter.
 - Automatic host DNS setup through `devdns` or Apple Container DNS.
 - Image digest pinning.
 - Full non-PostgreSQL `BackendExecEnv` host/container naming variables.
@@ -117,7 +116,7 @@ dropuser
 
 `pg_ctl` is the lifecycle interface for the persistent PostgreSQL container:
 
-- `pg_ctl start` creates the container if missing, starts it, and waits for Docker health to become `healthy`.
+- `pg_ctl start` creates the container if missing, starts it, and waits until PostgreSQL is ready.
 - `pg_ctl stop` stops and removes the container while preserving the data directory.
 - `pg_ctl status` reports the managed container status and returns success only when the container is running and healthy.
 - `pg_ctl restart` stops then starts.
@@ -125,13 +124,13 @@ dropuser
 
 `postgres` starts the managed server and follows its logs.
 
-Client commands such as `psql`, `pg_dump`, and `pg_restore` run in short-lived containers attached to the shared Docker network.
+Client commands such as `psql`, `pg_dump`, and `pg_restore` run in short-lived containers attached to the shared adapter network.
 
 ---
 
 ## Runtime Model
 
-The current runtime is Docker.
+The supported runtimes are Docker and Apple Container. Adapter selection happens during installation: an unset `MISE_DB_ADAPTER` prefers Apple Container, then Docker; `MISE_DB_ADAPTER=docker|apple` selects explicitly. The resolved adapter is persisted in the install manifest. Wrappers reject a conflicting non-empty `MISE_DB_ADAPTER` and direct the user to force-reinstall.
 
 The shared network name is:
 
@@ -177,6 +176,7 @@ TOOL=postgres
 VERSION=18.4
 IMAGE=postgres:18.4-alpine
 ISOLATED=true
+ADAPTER=apple
 ```
 
 Installed wrappers must use the copied manifest and wrapper files inside the versioned mise install directory. Do not symlink installed commands back to the plugin checkout.
@@ -190,6 +190,7 @@ Current structure:
 ```text
 metadata.lua
 lib/
+  cache.lua
   postgres.lua
   registry.lua
   utils.lua
@@ -200,11 +201,17 @@ hooks/
 wrappers/
   postgres
   lib/
+    apple.sh
     context.sh
     docker.sh
 tests/
+  fixtures/
+    dump.sql
+    postgres.json
   helpers.sh
   postgres.test.sh
+  tmp/
+    .gitkeep
 README.md
 AGENTS.md
 ```
@@ -219,7 +226,7 @@ Add helper scripts only when needed. Keep the implementation small and understan
 - Validate inputs early.
 - Fail with clear error messages.
 - Prefer explicit function arguments over hidden globals in shared helpers.
-- Keep functions in `wrappers/lib/context.sh` and `wrappers/lib/docker.sh` sorted alphabetically by function name.
+- Keep functions in `wrappers/lib/apple.sh`, `wrappers/lib/context.sh`, and `wrappers/lib/docker.sh` sorted alphabetically by function name.
 - Use uppercase readonly variables for wrapper-level constants such as `LIB_DIR`, `INSTALL_DIR`, `CONTAINER`, and `NETWORK`.
 - It is acceptable to use a file-level shellcheck disable for deliberate wrapper patterns, such as dynamic `source` paths or one-line readonly command substitutions.
 - Prefer small, focused shell helpers over one large dispatch script.
@@ -232,17 +239,17 @@ Add helper scripts only when needed. Keep the implementation small and understan
 Run static checks:
 
 ```bash
-bash -n wrappers/postgres wrappers/lib/context.sh wrappers/lib/docker.sh tests/postgres.test.sh
-shellcheck wrappers/postgres wrappers/lib/docker.sh tests/postgres.test.sh
+bash -n wrappers/postgres wrappers/lib/context.sh wrappers/lib/apple.sh wrappers/lib/docker.sh tests/postgres.test.sh
+shellcheck wrappers/postgres wrappers/lib/apple.sh wrappers/lib/docker.sh tests/postgres.test.sh
 ```
 
-Run the Docker smoke test:
+Run the adapter smoke test:
 
 ```bash
 tests/postgres.test.sh
 ```
 
-The smoke test creates a temporary mise install layout under `/tmp`, starts PostgreSQL, checks `pg_ctl status`, runs `select 1 as ok`, stops the container, and prints the temp directory.
+The smoke test creates a temporary mise install layout under `/tmp` for both adapters, verifies cached PostgreSQL version filtering, starts PostgreSQL, checks `pg_ctl status`, runs `select 1 as ok`, exercises a `pg_dump` and `pg_restore` round trip, and stops the container. Both Apple Container and Docker must be available.
 
 ---
 
@@ -254,8 +261,7 @@ Near-term priorities:
 2. Add data safety checks.
 3. Expand `BackendExecEnv` conventions for future MySQL and Valkey support.
 4. Add host DNS integration.
-5. Add Apple `container` support.
-6. Add MySQL and Valkey wrappers.
+5. Add MySQL and Valkey wrappers.
 
 ---
 

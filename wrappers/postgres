@@ -26,7 +26,23 @@ fi
 
 source "$INSTALL_DIR/manifest"
 source "$LIB_DIR/context.sh"
-source "$LIB_DIR/docker.sh"
+
+: "${PGUSER:?PGUSER is required}"
+: "${PGPASS:?PGPASS is required}"
+
+case "${ADAPTER:-}" in
+  apple)
+    source "$LIB_DIR/apple.sh"
+    ;;
+  docker)
+    source "$LIB_DIR/docker.sh"
+    ;;
+  *)
+    echo "mise-db manifest has an unsupported adapter: ${ADAPTER:-missing}" >&2
+    echo "Force-reinstall this tool to create a valid manifest." >&2
+    exit 1
+    ;;
+esac
 
 readonly CONTAINER="$(container_name)"
 readonly NETWORK="mise-db"
@@ -42,87 +58,84 @@ create_server_container() {
   ensure_network "$NETWORK"
   ensure_data_dir
 
-  docker create \
+  container_create "pg_isready -U $PGUSER" \
     --name "$CONTAINER" \
     --network "$NETWORK" \
     --volume "$(data_dir):/var/lib/postgresql/data" \
-    --env POSTGRES_USER="${PGUSER:-postgres}" \
-    --env POSTGRES_PASSWORD="${PGPASSWORD:-postgres}" \
+    --env POSTGRES_DB="$PGUSER" \
+    --env POSTGRES_USER="$PGUSER" \
+    --env POSTGRES_PASSWORD="$PGPASS" \
     --env PGDATA=/var/lib/postgresql/data/pgdata \
-    --health-cmd "pg_isready -U ${PGUSER:-postgres}" \
-    --health-interval 1s \
-    --health-timeout 5s \
-    --health-retries 60 \
     "$IMAGE" >/dev/null
 }
 
 start_server() {
-  require_docker
+  require_adapter
 
   if ! container_exists "$CONTAINER"; then
     create_server_container
   fi
 
   if ! container_running "$CONTAINER"; then
-    docker start "$CONTAINER" >/dev/null
+    container_start "$CONTAINER" >/dev/null
   fi
 
-  container_ready "$CONTAINER" 60
-  printf 'PostgreSQL %s running as %s on Docker network %s\n' "$VERSION" "$CONTAINER" "$NETWORK"
+  container_ready "$CONTAINER" 60 "$PGUSER"
+  printf 'PostgreSQL %s running as %s on %s network %s\n' "$VERSION" "$CONTAINER" "$ADAPTER" "$NETWORK"
 }
 
 stop_server() {
-  require_docker
+  require_adapter
 
   if ! container_exists "$CONTAINER"; then
-    echo "PostgreSQL container does not exist: $CONTAINER" >&2
+    printf 'PostgreSQL %s is not running as %s on %s network %s\n' "$VERSION" "$CONTAINER" "$ADAPTER" "$NETWORK"
     return 3
   fi
 
   if container_running "$CONTAINER"; then
-    docker stop "$CONTAINER" >/dev/null
+    container_stop "$CONTAINER" >/dev/null
   fi
 
-  docker rm "$CONTAINER" >/dev/null
+  container_delete "$CONTAINER" >/dev/null
 }
 
 status_server() {
-  require_docker
-  container_status "$CONTAINER" "PostgreSQL"
+  require_adapter
+  container_status "$CONTAINER" "PostgreSQL" "$PGUSER"
 }
 
 reload_server() {
-  require_docker
+  require_adapter
 
   if ! container_running "$CONTAINER"; then
     echo "PostgreSQL container is not running: $CONTAINER" >&2
     return 3
   fi
 
-  docker exec "$CONTAINER" pg_ctl reload -D "${PGDATA:-/var/lib/postgresql/data/pgdata}"
+  container_exec "$CONTAINER" pg_ctl reload -D "${PGDATA:-/var/lib/postgresql/data/pgdata}"
 }
 
 run_client() {
   local client="$1"
   shift
 
-  require_docker
+  require_adapter
   ensure_image "$IMAGE"
   ensure_network "$NETWORK"
 
   case "${1:-}" in
     --help|--version|-V)
-      docker run --rm "$IMAGE" "$client" "$@"
+      container_run --rm "$IMAGE" "$client" "$@"
       return
       ;;
   esac
 
-  docker run --rm "$(docker_tty_args)" \
+  container_run --rm "$(container_tty_args)" \
     --network "$NETWORK" \
     --volume "$PWD:$PWD" \
     --workdir "$PWD" \
-    --env PGPASSWORD="${PGPASSWORD:-postgres}" \
-    "$IMAGE" "$client" "--host=$CONTAINER" --port=5432 "--username=${PGUSER:-postgres}" "$@"
+    --env PGPASSWORD="$PGPASS" \
+    "$IMAGE" "$client" -h "$(container_host "$CONTAINER")" -U "$PGUSER" "$@"
 }
 
 pg_ctl_wrapper() {
@@ -162,7 +175,7 @@ case "$command_name" in
     ;;
   postgres)
     pg_ctl_wrapper start
-    docker logs -f "$CONTAINER"
+    container_logs "$CONTAINER"
     ;;
   psql|pg_dump|pg_restore|createdb|dropdb|createuser|dropuser)
     run_client "$command_name" "$@"

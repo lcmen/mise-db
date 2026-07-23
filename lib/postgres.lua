@@ -15,8 +15,11 @@ M.bins = {
 }
 M.image_repository = "library/postgres"
 M.image_tag_suffix = "-alpine"
+M.image_tag_name_filter = "alpine"
+M.minimum_major_version = 12
+M.registry_cache_name = "postgres.json"
 M.wrapper = "postgres"
-M.version_tag_pattern = "^(%d+%.%d+)%-alpine$"
+M.version_tag_pattern = "^(%d+%.?%d*)%-alpine$"
 
 --- Builds the Docker image reference for a PostgreSQL version.
 ---@param version string PostgreSQL version selected by mise.
@@ -32,8 +35,8 @@ function M.exec_env(ctx)
     local isolated = utils.boolean_option(ctx, "isolated", false)
     local container = utils.container_name("postgres", ctx.version, isolated)
     local env_vars = {
+        { key = "PGPASS", value = "postgres" },
         { key = "PGUSER", value = "postgres" },
-        { key = "PGPASSWORD", value = "postgres" },
     }
 
     local container_tld = os.getenv("MISE_DB_CONTAINER_TLD")
@@ -49,7 +52,13 @@ end
 ---@return string[] versions PostgreSQL versions available to mise.
 function M.list_versions()
     local registry = dofile(RUNTIME.pluginDirPath .. "/lib/registry.lua")
-    return registry.list_versions(M.image_repository, M.version_tag_pattern)
+    return registry.list_versions(
+        M.image_repository,
+        M.version_tag_pattern,
+        M.image_tag_name_filter,
+        M.minimum_major_version,
+        M.registry_cache_name
+    )
 end
 
 return M
