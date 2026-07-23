@@ -35,7 +35,9 @@ byte_sum() {
 #   0.
 #######################################
 container_name() {
-  printf 'mise-db-%s-%s-%s\n' "$TOOL" "$(version_tag "$VERSION")" "$(instance_name "$TOOL")"
+  local tool="${TOOL:?TOOL is required}"
+  local version="${VERSION:?VERSION is required}"
+  printf 'mise-db-%s-%s-%s\n' "$tool" "$(version_tag "$version")" "$(instance_name)"
 }
 
 #######################################
@@ -60,16 +62,12 @@ data_dir() {
 # Builds the instance identity for global or isolated mode.
 # Globals:
 #   ISOLATED
-#   TOOL
-# Arguments:
-#   $1: Tool name. Defaults to TOOL.
 # Outputs:
 #   "global" or "<project-slug>-<path-checksum>".
 # Returns:
 #   0.
 #######################################
 instance_name() {
-  local tool="${1:-${TOOL:?TOOL is required}}"
   local isolated="${ISOLATED:-false}"
 
   if [[ "$isolated" == "true" ]]; then

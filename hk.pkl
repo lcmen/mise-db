@@ -1,0 +1,22 @@
+amends "package://github.com/jdx/hk/releases/download/v1.52.0/hk@1.52.0#/Config.pkl"
+
+local staticChecks = new Mapping<String, Step> {
+    ["syntax"] {
+        glob = "{wrappers/postgres,**/*.sh}"
+        check = "bash -n {{ files }}"
+    }
+    ["shellcheck"] {
+        glob = "{wrappers/postgres,**/*.sh}"
+        check = "shellcheck {{ files }}"
+    }
+}
+
+hooks {
+    ["check"] {
+        steps = staticChecks
+    }
+    ["pre-commit"] {
+        stash = "git"
+        steps = staticChecks
+    }
+}

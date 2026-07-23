@@ -1,0 +1,20 @@
+[tools]
+hk = "latest"
+pkl = "latest"
+shellcheck = "latest"
+
+[tasks.check]
+description = "Run hk check hooks"
+run = "hk check"
+
+[tasks.fix]
+description = "Run hk fix hooks"
+run = "hk fix"
+
+[tasks.hooks-install]
+description = "Install hk git hooks through mise"
+run = "hk install --mise"
+
+[tasks.pre-commit]
+description = "Run hk pre-commit hook"
+run = "hk run pre-commit"
