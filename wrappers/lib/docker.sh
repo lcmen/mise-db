@@ -3,6 +3,52 @@
 set -euo pipefail
 
 #######################################
+# Creates a managed container with a healthcheck.
+# Arguments:
+#   $1: Health command.
+#   Remaining arguments: Arguments passed to docker create.
+# Returns:
+#   The Docker create command's exit status.
+#######################################
+container_create() {
+  local health_cmd="${1:?health command is required}"
+  shift
+
+  docker create \
+    --health-cmd "$health_cmd" \
+    --health-interval 1s \
+    --health-timeout 5s \
+    --health-retries 60 \
+    "$@"
+}
+
+#######################################
+# Deletes the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Docker remove command's exit status.
+#######################################
+container_delete() {
+  docker rm "${1:?container name is required}"
+}
+
+#######################################
+# Executes a command in the managed container.
+# Arguments:
+#   $1: Container name.
+#   Remaining arguments: Command and arguments to execute.
+# Returns:
+#   The Docker exec command's exit status.
+#######################################
+container_exec() {
+  local container="${1:?container name is required}"
+  shift
+
+  docker exec "$container" "$@"
+}
+
+#######################################
 # Checks whether the managed container exists.
 # Arguments:
 #   $1: Container name.
@@ -26,6 +72,30 @@ container_exists() {
 container_health() {
   local container="${1:?container name is required}"
   docker container inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container"
+}
+
+#######################################
+# Returns the managed container's client connection host.
+# Arguments:
+#   $1: Container name.
+# Outputs:
+#   Container name.
+# Returns:
+#   0.
+#######################################
+container_host() {
+  printf '%s\n' "${1:?container name is required}"
+}
+
+#######################################
+# Follows logs from the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Docker logs command's exit status.
+#######################################
+container_logs() {
+  docker logs --follow "${1:?container name is required}"
 }
 
 #######################################
@@ -72,6 +142,17 @@ container_ready() {
 }
 
 #######################################
+# Runs a command in a new Docker container.
+# Arguments:
+#   All arguments: Arguments passed to docker run.
+# Returns:
+#   The Docker run command's exit status.
+#######################################
+container_run() {
+  docker run "$@"
+}
+
+#######################################
 # Checks whether the managed container is currently running.
 # Arguments:
 #   $1: Container name.
@@ -81,6 +162,17 @@ container_ready() {
 container_running() {
   local container="${1:?container name is required}"
   [[ "$(docker container inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)" == "true" ]]
+}
+
+#######################################
+# Starts the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Docker start command's exit status.
+#######################################
+container_start() {
+  docker start "${1:?container name is required}"
 }
 
 #######################################
@@ -112,6 +204,17 @@ container_status() {
 
   echo "$label container is running but not healthy: $container"
   return 3
+}
+
+#######################################
+# Stops the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Docker stop command's exit status.
+#######################################
+container_stop() {
+  docker stop "${1:?container name is required}"
 }
 
 #######################################

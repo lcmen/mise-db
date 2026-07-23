@@ -148,7 +148,7 @@ mise-db
 
 `pg_ctl start` creates a persistent container and waits until PostgreSQL is ready before returning. Docker uses a container healthcheck; Apple Container polls `pg_isready` inside the managed container.
 
-Docker client commands run in short-lived containers on the shared network. Apple Container client commands run with `container exec` inside the managed PostgreSQL container because separate Apple client containers may not be able to reach the server container over the shared network.
+Client commands run in short-lived containers on the shared network. Docker clients connect to the managed container by name; Apple Container clients connect to its IPv4 address on that network.
 
 If the selected runtime removes the image later, wrappers fail with a clear message. Run `mise install --force db:postgres@18.4` to pull the image back.
 
@@ -156,5 +156,5 @@ If the selected runtime removes the image later, wrappers fail with a clear mess
 
 - PostgreSQL is the only implemented database.
 - MySQL and Valkey are planned but not available yet.
-- Host DNS integration is not implemented yet.
+- Automatic host DNS setup is not implemented yet.
 - Images are pulled by tag, not pinned by digest yet.

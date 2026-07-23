@@ -58,31 +58,15 @@ create_server_container() {
   ensure_network "$NETWORK"
   ensure_data_dir
 
-  if [[ "$ADAPTER" == "apple" ]]; then
-    container create \
-      --name "$CONTAINER" \
-      --network "$NETWORK" \
-      --volume "$(data_dir):/var/lib/postgresql/data" \
-      --env POSTGRES_DB="$PGUSER" \
-      --env POSTGRES_USER="$PGUSER" \
-      --env POSTGRES_PASSWORD="$PGPASS" \
-      --env PGDATA=/var/lib/postgresql/data/pgdata \
-      "$IMAGE" >/dev/null
-  else
-    docker create \
-      --name "$CONTAINER" \
-      --network "$NETWORK" \
-      --volume "$(data_dir):/var/lib/postgresql/data" \
-      --env POSTGRES_DB="$PGUSER" \
-      --env POSTGRES_USER="$PGUSER" \
-      --env POSTGRES_PASSWORD="$PGPASS" \
-      --env PGDATA=/var/lib/postgresql/data/pgdata \
-      --health-cmd "pg_isready -U $PGUSER" \
-      --health-interval 1s \
-      --health-timeout 5s \
-      --health-retries 60 \
-      "$IMAGE" >/dev/null
-  fi
+  container_create "pg_isready -U $PGUSER" \
+    --name "$CONTAINER" \
+    --network "$NETWORK" \
+    --volume "$(data_dir):/var/lib/postgresql/data" \
+    --env POSTGRES_DB="$PGUSER" \
+    --env POSTGRES_USER="$PGUSER" \
+    --env POSTGRES_PASSWORD="$PGPASS" \
+    --env PGDATA=/var/lib/postgresql/data/pgdata \
+    "$IMAGE" >/dev/null
 }
 
 start_server() {
@@ -93,11 +77,7 @@ start_server() {
   fi
 
   if ! container_running "$CONTAINER"; then
-    if [[ "$ADAPTER" == "apple" ]]; then
-      container start "$CONTAINER" >/dev/null
-    else
-      docker start "$CONTAINER" >/dev/null
-    fi
+    container_start "$CONTAINER" >/dev/null
   fi
 
   container_ready "$CONTAINER" 60 "$PGUSER"
@@ -108,23 +88,15 @@ stop_server() {
   require_adapter
 
   if ! container_exists "$CONTAINER"; then
-    echo "PostgreSQL container does not exist: $CONTAINER" >&2
+    printf 'PostgreSQL %s is not running as %s on %s network %s\n' "$VERSION" "$CONTAINER" "$ADAPTER" "$NETWORK"
     return 3
   fi
 
   if container_running "$CONTAINER"; then
-    if [[ "$ADAPTER" == "apple" ]]; then
-      container stop "$CONTAINER" >/dev/null
-    else
-      docker stop "$CONTAINER" >/dev/null
-    fi
+    container_stop "$CONTAINER" >/dev/null
   fi
 
-  if [[ "$ADAPTER" == "apple" ]]; then
-    container delete "$CONTAINER" >/dev/null
-  else
-    docker rm "$CONTAINER" >/dev/null
-  fi
+  container_delete "$CONTAINER" >/dev/null
 }
 
 status_server() {
@@ -140,11 +112,7 @@ reload_server() {
     return 3
   fi
 
-  if [[ "$ADAPTER" == "apple" ]]; then
-    container exec "$CONTAINER" pg_ctl reload -D "${PGDATA:-/var/lib/postgresql/data/pgdata}"
-  else
-    docker exec "$CONTAINER" pg_ctl reload -D "${PGDATA:-/var/lib/postgresql/data/pgdata}"
-  fi
+  container_exec "$CONTAINER" pg_ctl reload -D "${PGDATA:-/var/lib/postgresql/data/pgdata}"
 }
 
 run_client() {
@@ -157,30 +125,17 @@ run_client() {
 
   case "${1:-}" in
     --help|--version|-V)
-      if [[ "$ADAPTER" == "apple" ]]; then
-        container run --rm "$IMAGE" "$client" "$@"
-      else
-        docker run --rm "$IMAGE" "$client" "$@"
-      fi
+      container_run --rm "$IMAGE" "$client" "$@"
       return
       ;;
   esac
 
-  if [[ "$ADAPTER" == "apple" ]]; then
-    container run --rm "$(container_tty_args)" \
-      --network "$NETWORK" \
-      --volume "$PWD:$PWD" \
-      --workdir "$PWD" \
-      --env PGPASSWORD="$PGPASS" \
-      "$IMAGE" "$client" -h "$(container_ip "$CONTAINER")" -U "$PGUSER" "$@"
-  else
-    docker run --rm "$(container_tty_args)" \
-      --network "$NETWORK" \
-      --volume "$PWD:$PWD" \
-      --workdir "$PWD" \
-      --env PGPASSWORD="$PGPASS" \
-      "$IMAGE" "$client" -h "$CONTAINER" -U "$PGUSER" "$@"
-  fi
+  container_run --rm "$(container_tty_args)" \
+    --network "$NETWORK" \
+    --volume "$PWD:$PWD" \
+    --workdir "$PWD" \
+    --env PGPASSWORD="$PGPASS" \
+    "$IMAGE" "$client" -h "$(container_host "$CONTAINER")" -U "$PGUSER" "$@"
 }
 
 pg_ctl_wrapper() {
@@ -220,11 +175,7 @@ case "$command_name" in
     ;;
   postgres)
     pg_ctl_wrapper start
-    if [[ "$ADAPTER" == "apple" ]]; then
-      container logs --follow "$CONTAINER"
-    else
-      docker logs -f "$CONTAINER"
-    fi
+    container_logs "$CONTAINER"
     ;;
   psql|pg_dump|pg_restore|createdb|dropdb|createuser|dropuser)
     run_client "$command_name" "$@"

@@ -4,12 +4,10 @@ local json = require("json")
 
 local CACHE_TTL_SECONDS = 24 * 60 * 60
 
-local shell_quote
-
 --- Quotes a value for use as one POSIX shell argument.
 ---@param value any Value to quote.
 ---@return string quoted Shell-quoted value.
-function shell_quote(value)
+local function shell_quote(value)
     return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 

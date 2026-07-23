@@ -164,11 +164,12 @@ EOF
 }
 
 #######################################
-# Runs a command with mise-db test environment variables for an adapter.
+# Runs an installed command with mise-db test environment variables for an adapter.
 # Arguments:
 #   $1: Adapter, docker or apple.
 #   $2: Temporary install directory.
-#   $@: Command and arguments to execute.
+#   $3: Installed command name.
+#   $@: Command arguments.
 # Returns:
 #   The wrapped command's exit status.
 #######################################
@@ -177,5 +178,5 @@ run() {
   local install_dir="${2:?install dir is required}"
   shift 2
 
-  MISE_DB_ADAPTER="$adapter" MISE_PROJECT_ROOT="$install_dir" XDG_DATA_HOME="$install_dir/data" "$@"
+  MISE_DB_ADAPTER="$adapter" MISE_PROJECT_ROOT="$install_dir" PATH="$install_dir/bin:$PATH" XDG_DATA_HOME="$install_dir/data" "$@"
 }

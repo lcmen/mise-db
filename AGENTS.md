@@ -39,7 +39,7 @@ The current implementation is a PostgreSQL-only OCI-wrapper MVP with Docker and 
 
 Implemented:
 
-- `BackendListVersions` returns PostgreSQL versions discovered from Docker Hub tags via `lib/registry.lua`.
+- `BackendListVersions` returns PostgreSQL versions discovered from Docker Hub tags via `lib/registry.lua`, with a 24-hour cache managed by `lib/cache.lua`. Set `MISE_DB_CACHE=0` to bypass the cache.
 - `BackendInstall` validates `postgres`, resolves an Apple Container or Docker adapter, pulls `postgres:<version>-alpine`, copies wrappers into the mise install path, writes a manifest, and creates command symlinks.
 - `BackendExecEnv` adds the install `bin/` directory to `PATH`, sets basic PostgreSQL credentials, and sets `PGHOST` when `MISE_DB_CONTAINER_TLD` is configured.
 - PostgreSQL wrappers manage persistent server containers and short-lived client containers through the manifest-selected adapter.
@@ -190,6 +190,7 @@ Current structure:
 ```text
 metadata.lua
 lib/
+  cache.lua
   postgres.lua
   registry.lua
   utils.lua
@@ -204,8 +205,13 @@ wrappers/
     context.sh
     docker.sh
 tests/
+  fixtures/
+    dump.sql
+    postgres.json
   helpers.sh
   postgres.test.sh
+  tmp/
+    .gitkeep
 README.md
 AGENTS.md
 ```
@@ -243,7 +249,7 @@ Run the adapter smoke test:
 tests/postgres.test.sh
 ```
 
-The smoke test creates a temporary mise install layout under `/tmp` for both adapters, starts PostgreSQL, checks `pg_ctl status`, runs `select 1 as ok`, and stops the container. Both Apple Container and Docker must be available.
+The smoke test creates a temporary mise install layout under `/tmp` for both adapters, verifies cached PostgreSQL version filtering, starts PostgreSQL, checks `pg_ctl status`, runs `select 1 as ok`, exercises a `pg_dump` and `pg_restore` round trip, and stops the container. Both Apple Container and Docker must be available.
 
 ---
 

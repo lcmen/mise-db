@@ -4,19 +4,11 @@ local cache = dofile(RUNTIME.pluginDirPath .. "/lib/cache.lua")
 local utils = dofile(RUNTIME.pluginDirPath .. "/lib/utils.lua")
 local json = require("json")
 
-local decode_tags_response
-local fetch
-local fetch_tags
-local matching_version
-local next_url
-local shell_quote
-local url_query_value
-
 --- Decodes a Docker Hub tags response.
 ---@param body string Response body.
 ---@param url string URL fetched.
 ---@return table response Decoded response body.
-function decode_tags_response(body, url)
+local function decode_tags_response(body, url)
     local ok, response = pcall(json.decode, body)
     if not ok or type(response) ~= "table" then
         error("failed to parse registry tags from " .. url)
@@ -28,8 +20,8 @@ end
 --- Fetches a URL using curl.
 ---@param url string URL to request.
 ---@return string body Response body.
-function fetch(url)
-    local handle = io.popen("curl -fsSL --retry 2 --connect-timeout 10 --max-time 30 " .. shell_quote(url) .. " 2>/dev/null")
+local function fetch(url)
+    local handle = io.popen("curl -fsSL --retry 2 --connect-timeout 10 --max-time 30 " .. utils.shell_quote(url) .. " 2>/dev/null")
     if not handle then
         error("failed to run curl while fetching registry tags")
     end
@@ -47,13 +39,16 @@ end
 ---@param repository string Docker Hub repository path, such as "library/postgres".
 ---@param name_filter string|nil Optional Docker Hub tag-name filter.
 ---@return table[] results Docker Hub tag results.
-function fetch_tags(repository, name_filter)
+local function fetch_tags(repository, name_filter)
     local results = {}
     local url = "https://registry.hub.docker.com/v2/repositories/" .. repository .. "/tags?page_size=100"
     local page = 1
 
     if name_filter ~= nil and name_filter ~= "" then
-        url = url .. "&name=" .. url_query_value(name_filter)
+        local encoded_filter = tostring(name_filter):gsub("([^A-Za-z0-9_.~-])", function(char)
+            return string.format("%%%02X", string.byte(char))
+        end)
+        url = url .. "&name=" .. encoded_filter
     end
 
     while url do
@@ -65,7 +60,12 @@ function fetch_tags(repository, name_filter)
                 table.insert(results, tag)
             end
         end
-        url = next_url(response)
+
+        if type(response.next) == "string" and response.next ~= "" then
+            url = response.next
+        else
+            url = nil
+        end
         page = page + 1
     end
 
@@ -78,7 +78,7 @@ end
 ---@param tag_pattern string Lua pattern with the version as the first capture.
 ---@param min_major number|nil Optional minimum major version.
 ---@return string|nil version Matching version, or nil when unsupported.
-function matching_version(tag, architecture, tag_pattern, min_major)
+local function matching_version(tag, architecture, tag_pattern, min_major)
     if type(tag) ~= "table" or tag.name == nil then
         return nil
     end
@@ -105,32 +105,6 @@ function matching_version(tag, architecture, tag_pattern, min_major)
     end
 
     return version
-end
-
---- Extracts the next pagination URL from a Docker Hub tags response.
----@param response table Docker Hub tags response body.
----@return string|nil url Next page URL, or nil when there are no more pages.
-function next_url(response)
-    if type(response.next) ~= "string" or response.next == "" then
-        return nil
-    end
-    return response.next
-end
-
---- Quotes a value for use as one POSIX shell argument.
----@param value any Value to quote.
----@return string quoted Shell-quoted value.
-function shell_quote(value)
-    return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
-
---- Encodes a small query value for Docker Hub API URLs.
----@param value string Query value.
----@return string value URL-encoded query value.
-function url_query_value(value)
-    return tostring(value):gsub("([^A-Za-z0-9_.~-])", function(char)
-        return string.format("%%%02X", string.byte(char))
-    end)
 end
 
 --- Lists versions by matching Docker Hub tags with a Lua pattern.

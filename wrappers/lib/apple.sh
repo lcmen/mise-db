@@ -3,6 +3,47 @@
 set -euo pipefail
 
 #######################################
+# Creates a managed container.
+# Arguments:
+#   $1: Health command, unused by Apple Container.
+#   Remaining arguments: Arguments passed to container create.
+# Returns:
+#   The Apple Container create command's exit status.
+#######################################
+container_create() {
+  : "${1:?health command is required}"
+  shift
+
+  container create "$@"
+}
+
+#######################################
+# Deletes the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Apple Container delete command's exit status.
+#######################################
+container_delete() {
+  container delete "${1:?container name is required}"
+}
+
+#######################################
+# Executes a command in the managed container.
+# Arguments:
+#   $1: Container name.
+#   Remaining arguments: Command and arguments to execute.
+# Returns:
+#   The Apple Container exec command's exit status.
+#######################################
+container_exec() {
+  local managed_container="${1:?container name is required}"
+  shift
+
+  container exec "$managed_container" "$@"
+}
+
+#######################################
 # Checks whether the managed container exists.
 # Arguments:
 #   $1: Container name.
@@ -11,6 +52,19 @@ set -euo pipefail
 #######################################
 container_exists() {
   container inspect "${1:?container name is required}" >/dev/null 2>&1
+}
+
+#######################################
+# Returns the managed container's client connection host.
+# Arguments:
+#   $1: Container name.
+# Outputs:
+#   IPv4 address without its CIDR suffix.
+# Returns:
+#   0 when an IPv4 address is available; exits with an error otherwise.
+#######################################
+container_host() {
+  container_ip "${1:?container name is required}"
 }
 
 #######################################
@@ -36,6 +90,17 @@ container_ip() {
   fi
 
   printf '%s\n' "$address"
+}
+
+#######################################
+# Follows logs from the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Apple Container logs command's exit status.
+#######################################
+container_logs() {
+  container logs --follow "${1:?container name is required}"
 }
 
 #######################################
@@ -70,6 +135,17 @@ container_ready() {
 }
 
 #######################################
+# Runs a command in a new Apple Container container.
+# Arguments:
+#   All arguments: Arguments passed to container run.
+# Returns:
+#   The Apple Container run command's exit status.
+#######################################
+container_run() {
+  container run "$@"
+}
+
+#######################################
 # Checks whether the managed container is currently running.
 # Arguments:
 #   $1: Container name.
@@ -78,6 +154,17 @@ container_ready() {
 #######################################
 container_running() {
   container inspect "${1:?container name is required}" 2>/dev/null | grep -Eq '"state"[[:space:]]*:[[:space:]]*"running"'
+}
+
+#######################################
+# Starts the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Apple Container start command's exit status.
+#######################################
+container_start() {
+  container start "${1:?container name is required}"
 }
 
 #######################################
@@ -111,6 +198,17 @@ container_status() {
 
   echo "$label container is running but PostgreSQL is not ready: $managed_container"
   return 3
+}
+
+#######################################
+# Stops the managed container.
+# Arguments:
+#   $1: Container name.
+# Returns:
+#   The Apple Container stop command's exit status.
+#######################################
+container_stop() {
+  container stop "${1:?container name is required}"
 }
 
 #######################################
