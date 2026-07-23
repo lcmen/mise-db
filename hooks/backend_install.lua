@@ -33,7 +33,11 @@ end
 local function pull_image(image, resolved_adapter)
     local pull_command
 
-    cmd.exec("printf '%s\n' " .. utils.shell_quote("mise-db: pulling " .. image .. " with " .. resolved_adapter .. "...") .. " >&2")
+    cmd.exec(
+        "printf '%s\n' "
+            .. utils.shell_quote("mise-db: pulling " .. image .. " with " .. resolved_adapter .. "...")
+            .. " >&2"
+    )
 
     if resolved_adapter == "apple" then
         pull_command = "container image pull " .. utils.shell_quote(image)

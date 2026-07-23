@@ -6,12 +6,12 @@ shellcheck = "latest"
 stylua = "latest"
 
 [tasks.check]
-description = "Run hk check hooks"
-run = "hk check"
+description = "Run hk checks on all files"
+run = "hk check --all"
 
 [tasks.fix]
-description = "Run hk fix hooks"
-run = "hk fix"
+description = "Run hk fixes on all files"
+run = "hk fix --all --no-stage"
 
 [tasks.hooks]
 description = "Install hk git hooks through mise"

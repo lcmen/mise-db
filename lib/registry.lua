@@ -21,7 +21,8 @@ end
 ---@param url string URL to request.
 ---@return string body Response body.
 local function fetch(url)
-    local handle = io.popen("curl -fsSL --retry 2 --connect-timeout 10 --max-time 30 " .. utils.shell_quote(url) .. " 2>/dev/null")
+    url = utils.shell_quote(url)
+    local handle = io.popen("curl -fsSL --retry 2 --connect-timeout 10 --max-time 30 " .. url .. " 2>/dev/null")
     if not handle then
         error("failed to run curl while fetching registry tags")
     end

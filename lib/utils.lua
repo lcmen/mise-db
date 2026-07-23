@@ -4,15 +4,22 @@ local M = {}
 ---@type string[]
 M.supported_tools = { "postgres" }
 
---- Builds a shell test for whether a runtime adapter is available.
+--- Checks whether a runtime adapter is available.
 ---@param adapter string Runtime adapter, either "apple" or "docker".
----@return string command Shell command that exits successfully when available.
+---@return string|nil adapter The adapter name when available, or nil otherwise.
 local function adapter_available(adapter)
+    local cmd = require("cmd")
+    local command
+
     if adapter == "apple" then
-        return "command -v container >/dev/null 2>&1 && container system status >/dev/null 2>&1"
+        command = "container system status >/dev/null 2>&1"
+    elseif adapter == "docker" then
+        command = "docker info >/dev/null 2>&1"
+    else
+        return nil
     end
 
-    return "command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1"
+    return pcall(cmd.exec, command) and adapter or nil
 end
 
 --- Detects the current host architecture in OCI platform terms.
@@ -112,21 +119,15 @@ end
 --- Resolves the runtime adapter for an installation.
 ---@return string adapter "apple" or "docker"
 function M.resolve_adapter()
-    local cmd = require("cmd")
     local requested = os.getenv("MISE_DB_ADAPTER")
 
     if requested ~= nil and requested ~= "" then
-        if requested ~= "apple" and requested ~= "docker" then
-            error("invalid MISE_DB_ADAPTER '" .. requested .. "'; expected docker or apple")
-        end
-
-        cmd.exec(adapter_available(requested) .. " || { echo 'mise-db adapter " .. requested .. " is not available.' >&2; exit 1; }")
-        return requested
+        return adapter_available(requested) or error("mise-db adapter " .. requested .. " is not available")
     end
 
-    return cmd.exec("if " .. adapter_available("apple") .. "; then printf apple; "
-        .. "elif " .. adapter_available("docker") .. "; then printf docker; "
-        .. "else echo 'mise-db requires a running Apple Container service or Docker daemon.' >&2; exit 1; fi")
+    return adapter_available("apple")
+        or adapter_available("docker")
+        or error("mise-db requires a running Apple Container service or Docker daemon")
 end
 
 --- Converts arbitrary text into a lowercase slug.

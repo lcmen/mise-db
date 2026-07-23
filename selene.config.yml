@@ -6,3 +6,6 @@ globals:
     any: true
   RUNTIME:
     any: true
+  # Selene's Lua 5.1 standard does not model the standard error file handle.
+  io.stderr:
+    any: true
