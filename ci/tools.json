@@ -1,0 +1,38 @@
+[
+  {
+    "tool": "postgres",
+    "version": "18.6"
+  },
+  {
+    "tool": "postgres",
+    "version": "17.11"
+  },
+  {
+    "tool": "postgres",
+    "version": "16.15"
+  },
+  {
+    "tool": "mysql",
+    "version": "9.7.2"
+  },
+  {
+    "tool": "mysql",
+    "version": "8.4.11"
+  },
+  {
+    "tool": "mysql",
+    "version": "8.0.46"
+  },
+  {
+    "tool": "valkey",
+    "version": "9.1.1"
+  },
+  {
+    "tool": "valkey",
+    "version": "8.1.9"
+  },
+  {
+    "tool": "valkey",
+    "version": "7.2.14"
+  }
+]

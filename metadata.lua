@@ -1,6 +1,6 @@
 PLUGIN = {
-    name = "hako",
+    name = "db",
     version = "0.1.0",
-    description = "mise backend plugin for versioned database command wrappers backed by OCI images",
+    description = "mise backend plugin for prebuilt database binaries",
     author = "Lucas Mendelowski <lucas@mendelowski.com>",
 }

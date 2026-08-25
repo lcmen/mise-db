@@ -3,12 +3,12 @@ import "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Builtin
 
 local staticChecks = new Mapping<String, Step> {
     ["syntax"] {
-        glob = "{wrappers/postgres,wrappers/redis,**/*.sh}"
+        glob = "**/*.sh"
         check = "bash -n {{ files }}"
     }
     ["selene"] = Builtins.selene
     ["shellcheck"] {
-        glob = "{wrappers/postgres,wrappers/redis,**/*.sh}"
+        glob = "**/*.sh"
         check = "shellcheck {{ files }}"
     }
     ["stylua"] = Builtins.stylua

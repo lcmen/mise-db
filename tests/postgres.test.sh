@@ -1,101 +1,28 @@
 #!/usr/bin/env bash
 
-# shellcheck disable=SC1091,SC2155
+# shellcheck disable=SC1091
 set -euo pipefail
 
-ADAPTERS=(apple docker)
-INSTALL_DIRS=()
 ROOT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-
 source "$ROOT_DIR/tests/helpers.sh"
 
-setup() {
-  export _HAKO_POSTGRES_FAMILY=18
-  export _HAKO_POSTGRES_IMAGE=postgres:18.4-alpine
-  export _HAKO_POSTGRES_NAMESPACE=smoke
-  export _HAKO_POSTGRES_VERSION=18.4
-  export PGPASS=postgres
-  export PGUSER=postgres
-  local adapter="${1}"
-  local install_dir="$(install_tool postgres 18.4 "$adapter")"
+trap cleanup_mise EXIT
+setup_mise
 
-  INSTALL_DIRS+=("$install_dir")
-  install_wrapper "$ROOT_DIR" "$install_dir" postgres pg_ctl psql pg_dump pg_restore
-}
+version="$(tool_version postgres)"
+prepare_release postgres "$version" postgres pg_ctl initdb psql createdb dropdb createuser dropuser
+versions="$(run_mise ls-remote db:postgres)"
+major="${version%%.*}"
 
-activation_state_test() {
-  local install_dir="${INSTALL_DIRS[$((${#INSTALL_DIRS[@]} - 1))]}"
-  local output status
+assert_line "$version" <<<"$versions"
+[[ "$(run_mise latest "db:postgres@$major")" == "$version" ]]
 
-  capture output status env -u _HAKO_POSTGRES_VERSION PATH="$install_dir/bin:$PATH" HAKO_ADAPTER=docker pg_ctl status
-  assert_equal 1 "$status"
-  assert_include "_HAKO_POSTGRES_VERSION is required" "$output"
-  assert_include "activated mise environment" "$output"
+install_tool postgres "$version"
 
-  capture output status env PATH="$install_dir/bin:$PATH" HAKO_ADAPTER=invalid pg_ctl status
-  assert_equal 1 "$status"
-  assert_include "HAKO_ADAPTER must be set to 'apple' or 'docker'" "$output"
-}
-
-cleanup() {
-  local adapter="${1}"
-  local install_dir
-  for install_dir in "${INSTALL_DIRS[@]:-}"; do
-    run "$adapter" "$install_dir" pg_ctl stop >/dev/null 2>&1 || true
-  done
-}
-
-versions_test() {
-  local cache_dir output
-
-  cache_dir="$(create_cache "$ROOT_DIR" postgres)"
-  output="$(HAKO_ADAPTER=docker XDG_CACHE_HOME="$cache_dir" mise ls-remote hako:postgres)"
-
-  assert_line 18.3 <<<"$output"
-  assert_line 18.4 <<<"$output"
-  refute 11.22 <<<"$output"
-  refute 18 <<<"$output"
-  refute 18.5-rc1 <<<"$output"
-  refute 18.4-alpine3.22 <<<"$output"
-  refute 19.1 <<<"$output"
-
-  assert_equal 18.4 "$(HAKO_ADAPTER=docker XDG_CACHE_HOME="$cache_dir" mise latest hako:postgres@18)"
-}
-
-service_test() {
-  local install_dir="${INSTALL_DIRS[$((${#INSTALL_DIRS[@]} - 1))]}"
-  local dump_file="$ROOT_DIR/tests/tmp/dump.sql"
-
-  rm -f "$dump_file"
-  run "$adapter" "$install_dir" pg_ctl start
-  run "$adapter" "$install_dir" pg_ctl status
-  run "$adapter" "$install_dir" psql -c 'select 1 as ok;'
-  run "$adapter" "$install_dir" psql --set ON_ERROR_STOP=1 <"$ROOT_DIR/tests/fixtures/dump.sql"
-
-  run "$adapter" "$install_dir" psql --set ON_ERROR_STOP=1 -c 'drop table hako_restore_fixture;'
-  run "$adapter" "$install_dir" pg_dump --format=custom --file "$dump_file" postgres
-  run "$adapter" "$install_dir" pg_restore --dbname postgres "$dump_file"
-}
-
-versions_test
-
-for adapter in "${ADAPTERS[@]}"; do
-  if ! adapter_available "$adapter"; then
-    echo "===================================================================="
-    echo "= Skipping Postgres tests for ${adapter} adapter - not available"
-    echo "===================================================================="
-    continue
-  else
-    echo "===================================================================="
-    echo "= Running Postgres tests with ${adapter} adapter"
-    echo "===================================================================="
-  fi
-
-  trap 'cleanup "$adapter"' EXIT
-
-  setup "$adapter"
-  activation_state_test
-  service_test "$adapter"
-  cleanup "$adapter"
-  trap - EXIT
+for command_name in postgres pg_ctl initdb psql createdb dropdb createuser dropuser; do
+  [[ -x "$(run_mise where "db:postgres@$version")/bin/$command_name" ]]
 done
+
+output="$(run_tool postgres "$version" postgres --version)"
+assert_include "$version" "$output"
+printf '%s\n' "$output"

@@ -1,6 +1,3 @@
-[settings]
-lockfile = true
-
 [tools]
 "aqua:Kampfkarren/selene" = "latest"
 hk = "latest"
@@ -22,3 +19,19 @@ run = "hk install --mise"
 [tasks.pre-commit]
 description = "Run hk pre-commit hook"
 run = "hk run pre-commit"
+
+[tasks.test]
+description = "Run binary plugin smoke tests"
+depends = ["test:mysql", "test:postgres", "test:valkey"]
+
+[tasks."test:mysql"]
+description = "Run the MySQL binary smoke test"
+run = "tests/mysql.test.sh"
+
+[tasks."test:postgres"]
+description = "Run the PostgreSQL binary smoke test"
+run = "tests/postgres.test.sh"
+
+[tasks."test:valkey"]
+description = "Run the Valkey binary smoke test"
+run = "tests/valkey.test.sh"

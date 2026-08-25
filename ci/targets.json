@@ -1,0 +1,54 @@
+{
+  "linux": [
+    {
+      "name": "ubuntu24-amd64",
+      "runner": "ubuntu-24.04",
+      "image": "ubuntu:24.04"
+    },
+    {
+      "name": "ubuntu24-arm64",
+      "runner": "ubuntu-24.04-arm",
+      "image": "ubuntu:24.04"
+    },
+    {
+      "name": "ubuntu26-amd64",
+      "runner": "ubuntu-24.04",
+      "image": "ubuntu:26.04"
+    },
+    {
+      "name": "ubuntu26-arm64",
+      "runner": "ubuntu-24.04-arm",
+      "image": "ubuntu:26.04"
+    },
+    {
+      "name": "fedora43-amd64",
+      "runner": "ubuntu-24.04",
+      "image": "fedora:43"
+    },
+    {
+      "name": "fedora43-arm64",
+      "runner": "ubuntu-24.04-arm",
+      "image": "fedora:43"
+    },
+    {
+      "name": "fedora44-amd64",
+      "runner": "ubuntu-24.04",
+      "image": "fedora:44"
+    },
+    {
+      "name": "fedora44-arm64",
+      "runner": "ubuntu-24.04-arm",
+      "image": "fedora:44"
+    }
+  ],
+  "darwin": [
+    {
+      "name": "darwin-amd64",
+      "runner": "macos-15-intel"
+    },
+    {
+      "name": "darwin-arm64",
+      "runner": "macos-15"
+    }
+  ]
+}
