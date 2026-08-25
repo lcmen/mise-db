@@ -1,9 +1,7 @@
 # Generated release artifacts
 dist/
 build/
-/tmp/
-tests/tmp/*
-!tests/tmp/.gitkeep
+tmp/
 src/
 *.tar.xz
 *.tar.xz.sha256
@@ -15,7 +13,7 @@ src/
 # Extracted upstream source/package directories
 postgresql-*/
 mysql-*/
-redis-*/
+valkey-*/
 
 # Local install/package staging
 prefix/

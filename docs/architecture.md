@@ -1,114 +1,33 @@
 # Architecture
 
-## Overview
+mise-db is a mise backend plugin for installing prebuilt PostgreSQL, MySQL, and Valkey distributions. GitHub Actions produces platform-specific archives and publishes them as GitHub Release assets; the plugin downloads those assets during `mise install`.
 
-Hako is a mise backend plugin. It installs versioned command wrappers that run database tools from OCI images.
+## Plugin flow
 
-The main responsibilities are split between three systems:
+The plugin is installed under the public name `db`, so tools are selected as `db:postgres`, `db:mysql`, and `db:valkey`.
 
-- mise selects versions, installs files, and activates the tool environment.
-- hako translates mise actions into tool and runtime operations.
-- the container runtime stores images and runs containers.
+- `BackendListVersions` queries releases in `lcmen/mise-db`, accepts stable tags matching `<tool>-<version>`, and returns semantically sorted concrete versions.
+- `BackendInstall` derives the current distro/architecture target, finds the matching release asset through the GitHub API, downloads it, and extracts it into the mise install directory.
+- `BackendExecEnv` adds the installed `bin/` directory to `PATH`.
 
-## Main Components
+`GH_TOKEN` is optional for public releases and is added to GitHub API requests when present. When `MISE_DB_ASSET_DIR` is set, version discovery scans standard archive names in that directory and installation extracts the matching local target asset without contacting GitHub.
 
-The Lua code handles mise integration:
+## Targets and assets
 
-- `hooks/` contains the mise backend entry points.
-- `lib/utils.lua` validates tool names and provides shared behavior.
-- Each supported tool has a module in `lib/`. A tool module defines its image, commands, available versions, and activation environment.
-- `lib/registry.lua` discovers versions from an image registry.
-- `lib/cache.lua` caches registry responses to avoid repeated network requests.
+Targets are declared in `ci/targets.json`. macOS targets encode OS and architecture; Linux targets also encode the distribution release because the produced binaries dynamically link to distro libraries.
 
-The shell code handles installed commands:
-
-- `wrappers/` contains one main wrapper for each tool.
-- `wrappers/lib/context.sh` creates stable names and data paths.
-- Runtime adapter files translate common wrapper operations into commands for Docker or Apple Container.
-
-## Mise Lifecycle
-
-### Version discovery
-
-The version-list hook loads the requested tool module. The tool module asks the registry layer for image tags, filters them into supported concrete versions, and returns them to mise in version order. Mutable major-only image tags are not exposed. A major selector therefore resolves to an exact release, and `mise upgrade` can detect when that resolved release changes.
-
-Registry responses are cached for a limited time. Users can bypass the cache when they need fresh registry data.
-
-### Installation
-
-The install hook:
-
-1. Loads and validates the requested tool.
-2. Validates the globally configured container runtime.
-3. Pulls the selected image.
-4. Copies the wrapper and its support files into the mise install directory.
-5. Creates command links in the install `bin/` directory.
-
-Installed wrappers are self-contained. They use copies inside the versioned mise installation and do not link back to the plugin checkout.
-
-### Activation
-
-The environment hook validates and resolves the service namespace, adds the install `bin/` directory to `PATH`, and exports the resolved version, exact image, and namespace through underscore-prefixed, service-specific variables reserved for Hako's wrappers. There is no per-installation manifest.
-
-Activation prepares commands for use. It does not start a server.
-
-## Wrapper Runtime
-
-All command links for a tool point to the same wrapper. The wrapper checks the name used to call it and dispatches to the matching behavior.
-
-At startup, the wrapper:
-
-1. Finds its versioned install directory.
-2. Validates activation-provided version, image, and namespace.
-3. Loads shared context helpers.
-4. Loads the runtime adapter named by the global `HAKO_ADAPTER` setting.
-
-Wrappers manage persistent server containers and short-lived client containers. Before an operation uses the runtime or image, it checks that they are available. Wrappers do not pull missing images during normal command execution. A missing image causes a clear error so the user can reinstall or pull it again.
-
-## Runtime Adapters
-
-Docker and Apple Container use different command-line interfaces. Adapter files hide those differences behind a shared set of shell functions for operations such as:
-
-- creating, starting, stopping, and removing containers;
-- inspecting container state;
-- running commands and following logs;
-- creating the shared network;
-- checking local images and runtime availability.
-
-The wrapper calls this common interface instead of calling a runtime directly. `HAKO_ADAPTER` must globally select `apple` or `docker`. Installation and execution use that same explicit setting; adapters are never auto-detected. Changing it requires stopping services through the old runtime, updating the setting, force-reinstalling tools to pull their images into the new runtime, and starting them again. Hako does not coordinate containers left running across runtimes.
-
-## Identity, Storage, and Namespaces
-
-Hako creates deterministic container and storage identities.
-
-The container name follows this form:
+Release tags and assets follow these forms:
 
 ```text
-hako-<tool>-<version>-<namespace>
+<tool>-<version>
+<tool>-<version>-<target>.tar.xz
+<tool>-<version>-<target>.tar.xz.sha256
 ```
 
-All managed containers for one runtime use the shared `hako` network.
+Each archive extracts directly into the install prefix and contains `bin/`, `lib/`, `share/`, and `licenses/` as applicable.
 
-Persistent data is stored outside the mise install directory:
+## Build pipeline
 
-```text
-${XDG_DATA_HOME:-$HOME/.local/share}/hako/<tool>/<version>/<namespace>
-```
+`.github/workflows/build.yml` expands `ci/tools.json` across every target. Linux builds run inside the matching Ubuntu or Fedora image on architecture-matched GitHub runners. macOS builds run on native Intel and Apple Silicon runners. Every archive is verified in its target environment before release.
 
-Missing and empty namespace options resolve to `global`. Explicit namespaces must match `[a-z0-9]+(-[a-z0-9]+)*`. Each service resolves its own option, so PostgreSQL and Redis can use different namespaces in one environment. Project paths do not influence identity.
-
-Removing a container or uninstalling a mise tool must not remove its persistent data.
-
-## Extension Boundaries
-
-Adding another database tool normally requires:
-
-- a tool module with image, command, version, and environment definitions;
-- a wrapper for its server and client behavior;
-- registration in the supported tool list.
-
-Shared registry, cache, install, context, and adapter code should be reused where their behavior is truly common.
-
-Runtime adapter functions may still contain assumptions from the currently implemented tool. Review those assumptions before reusing an operation for a new database.
-
-Hako does not own container runtime internals, automatic host DNS setup, data deletion, application migrations, or native database binary publishing.
+`.github/workflows/rebuild.yml` rebuilds one tool/version for one target or all targets. Tool-specific acquisition, build, packaging, verification, and release logic lives in `ci/tools/`; shared release and platform helpers live in `ci/utils.sh`.
