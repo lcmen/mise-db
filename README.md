@@ -99,10 +99,10 @@ sudo dnf install ca-certificates libaio libicu libxml2 libxslt numactl-libs open
 
 ## Available Versions
 
-| Tool       | Versions                     |
-| ---------- | ---------------------------- |
-| `postgres` | `16.15`, `17.11`, `18.6`     |
-| `mysql`    | `8.4.11`, `9.7.2`, `26.7.0`  |
-| `valkey`   | `7.2.14`, `8.1.9`, `9.1.1`   |
+| Tool       | Versions                               |
+| ---------- | -------------------------------------- |
+| `postgres` | `16.15`, `17.11`, `18.6`               |
+| `mysql`    | `8.0.46`, `8.4.11`, `9.7.2`, `26.7.0` |
+| `valkey`   | `7.2.14`, `8.1.9`, `9.1.1`             |
 
 The build matrix tracks the current PostgreSQL and Valkey release lines, plus the current MySQL Innovation release and supported MySQL LTS lines. MySQL 26.7 uses Oracle's calendar-based `YY.M.P` versioning.
