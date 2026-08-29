@@ -34,13 +34,15 @@ With this variable set, `mise ls-remote` also discovers versions from archive fi
 
 ## Change a published tool version
 
-Add or update the concrete tool/version object in `ci/tools.json`. Do not add partial versions such as `18`; mise resolves those selectors from the concrete release list.
+Add or update the concrete tool/version object in `ci/tools.json`. Keep the newest patch release for each tracked upstream release line and remove lines that the project no longer supports. Do not add partial versions such as `18`; mise resolves those selectors from the concrete release list. MySQL 26.7 and later use `YY.M.P` calendar versions, which are still recorded as concrete versions.
+
+Confirm that an upstream version has downloadable source or native binary archives for every target before adding it. Some upstream release-note entries only update container images and cannot be used by this build pipeline.
 
 Build behavior belongs in `ci/tools/<tool>.sh`. It must support `build`, `package`, `verify`, and `release`, create the standard archive layout, include upstream licenses, verify required executables and linked libraries, and publish both the archive and checksum.
 
 Targets belong in `ci/targets.json`. A new Linux target needs a GitHub runner with the matching architecture, a distro container image, dependency setup in `ci/provision/linux.sh`, and corresponding runtime requirements in the README.
 
-Use the full build workflow for the declared matrix. Use the rebuild workflow for a single version or target.
+Use the full build workflow for the declared matrix. It skips target assets that already have both an archive and checksum. Use the rebuild workflow to replace one tool/version for a single target or all targets.
 
 ## Validation
 

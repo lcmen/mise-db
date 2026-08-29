@@ -37,6 +37,6 @@ Each test creates isolated mise data, cache, config, and state directories under
 4. Checks the archive's required public executables.
 5. Runs a lightweight version command from the installed tool.
 
-The tests require `tar` with xz support. They do not require network access, initialize database servers, or retain their temporary mise directories.
+The tests require `mise` and `tar` with xz support. They do not require network access, initialize database servers, or retain their temporary mise directories.
 
 When adding a tool, create `tests/<tool>.test.sh`. Assert the archive's documented command set and execute at least one fixture binary through `mise exec`. The build workflows separately verify real upstream binaries inside every target environment.
