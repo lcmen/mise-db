@@ -1,28 +1,30 @@
 # mise-db contributor guide
 
-mise-db is a [mise](https://mise.jdx.dev/) backend plugin that installs prebuilt database binaries from GitHub Releases.
+mise-db is a [mise](https://mise.jdx.dev/) backend plugin. It installs versioned database command wrappers backed by OCI images.
+
+PostgreSQL and Redis are implemented services. MySQL is planned.
 
 Start with the document that matches your work:
 
-- [Architecture](docs/architecture.md): plugin hooks, release assets, and build targets.
-- [Development](docs/development.md): local setup and release-matrix changes.
-- [Code conventions](docs/conventions.md): Lua and Bash style.
-- [Testing](docs/testing.md): checks and binary smoke tests.
+- [Architecture](docs/architecture.md): how the plugin, wrappers, and container runtimes fit together.
+- [Development](docs/development.md): how to set up the project, make changes, and add a service.
+- [Code conventions](docs/conventions.md): Lua and Bash style used in this repository.
+- [Testing](docs/testing.md): how to run and write tests.
+- [PostgreSQL](docs/services/postgresql.md): PostgreSQL-specific behavior.
+- [Redis](docs/services/redis.md): Redis-specific behavior.
 
 Keep these project rules:
 
-- The public plugin name is `db`; tools are `postgres`, `mysql`, and `valkey`.
-- Release tags use `<tool>-<version>`.
-- Assets use `<tool>-<version>-<target>.tar.xz` plus a SHA-256 file.
-- Supported targets are macOS arm64/x86_64 and the Ubuntu/Fedora targets in `ci/targets.json`.
-- Do not commit generated binaries. Build and publish them with GitHub Actions.
-- Archives must extract directly into a mise install and expose executables under `bin/`.
-- Version discovery must return concrete upstream versions; mise resolves partial selectors.
+- mise-db installs OCI-backed wrappers. Do not add native database build or release work unless the project direction changes.
+- Pull images during installation, not during normal wrapper execution.
+- Do not delete persistent database data during stop or uninstall.
+- Copy wrappers into the mise install. Do not link installed commands back to this checkout.
+- Public service names are `postgres`, `redis`, and `mysql`.
 
-Before submitting a change, install the current development tools and run:
+Before submitting a change, run:
 
 ```bash
 mise run check
 ```
 
-Run `mise run test` when plugin installation, version discovery, archive layout, or release assets change.
+Run the relevant smoke tests when the change affects runtime behavior. See [Testing](docs/testing.md) for requirements and commands.

@@ -1,42 +1,86 @@
 # Testing
 
-mise-db has static checks and end-to-end plugin smoke tests against local release assets.
+mise-db uses shell smoke tests for runtime behavior. The tests create a temporary mise install, then call the same command wrappers that users call.
 
-## Static checks
+## Requirements
 
-Install the development toolchain and run all configured checks:
+Install the development tools:
 
 ```bash
 mise install
+```
+
+Link the local plugin so mise can run its backend hooks:
+
+```bash
+mise plugin link mise-db /path/to/mise-db
+```
+
+Runtime tests need Docker, Apple Container, or both. The runtime service must be running. Tests explicitly set `MISE_DB_ADAPTER` for each adapter run, and missing test images are pulled before the test.
+mise-db does not auto-detect an adapter. Outside the test harness, changing the global setting requires stopping services through the old adapter and force-reinstalling tools after the change.
+
+The smoke test skips a runtime that is not available. Both runtimes are needed for complete adapter coverage, but the script does not require both to exit successfully.
+
+## Run checks
+
+Run all configured static checks:
+
+```bash
 mise run check
 ```
 
-This validates Bash syntax and style plus Lua linting and formatting.
-
-## Binary smoke tests
-
-Run every service test:
+Run all smoke tests:
 
 ```bash
-mise run test
+tests/run.sh
 ```
 
-Or run one directly:
+Run the PostgreSQL smoke test:
 
 ```bash
 tests/postgres.test.sh
-tests/mysql.test.sh
-tests/valkey.test.sh
 ```
 
-Each test creates isolated mise data, cache, config, and state directories under `/tmp`; links the checkout as the `db` plugin; packages stub executables using a version from `ci/tools.json`; and points `MISE_DB_ASSET_DIR` at that archive. It then:
+Run the Redis smoke test:
 
-1. Confirms the concrete version appears in `mise ls-remote`.
-2. Confirms a partial selector resolves to that version.
-3. Installs the matching release asset for the current platform.
-4. Checks the archive's required public executables.
-5. Runs a lightweight version command from the installed tool.
+```bash
+tests/redis.test.sh
+```
 
-The tests require `mise` and `tar` with xz support. They do not require network access, initialize database servers, or retain their temporary mise directories.
+For a quick check of shell files:
 
-When adding a tool, create `tests/<tool>.test.sh`. Assert the archive's documented command set and execute at least one fixture binary through `mise exec`. The build workflows separately verify real upstream binaries inside every target environment.
+```bash
+bash -n wrappers/postgres wrappers/redis wrappers/lib/*.sh tests/*.sh
+shellcheck wrappers/postgres wrappers/redis wrappers/lib/*.sh tests/*.sh
+```
+
+`mise run check` is the main command because it also checks Lua files.
+
+## How the smoke test works
+
+Before checking adapters, `tests/postgres.test.sh` uses `tests/fixtures/postgres.json` to verify version filtering and major-selector resolution without a registry request. For each available adapter, it then:
+
+1. Creates a temporary install under `/tmp`.
+2. Copies the wrapper files and supplies activation state through environment variables.
+3. Creates the command symlinks used by the test.
+4. Starts PostgreSQL and checks its status.
+5. Runs a query and a dump-and-restore round trip.
+6. Stops and removes the managed container.
+
+`tests/helpers.sh` provides setup, adapter, assertion, and command helpers. Each service setup exports its service-specific version, image, and name variables. `run` sets `MISE_DB_ADAPTER`, `PATH`, and `XDG_DATA_HOME` for the temporary install.
+
+The Redis smoke test uses the same adapter loop. It checks concrete minor and patch version discovery, floating-tag filtering, command installation, startup and readiness, client help/version without a server, and key access.
+
+## Write or extend a test
+
+- Use one `tests/<service>.test.sh` file for each service.
+- Enable `set -euo pipefail` in the test entry point.
+- Resolve the repository root from `BASH_SOURCE` and source `tests/helpers.sh`.
+- Keep test scenarios independent of the adapter when possible. Run the same scenario for both adapters.
+- Test installed public commands through `run`. Do not call wrapper internals.
+- Put stable input in `tests/fixtures/` and generated output in `tests/tmp/`.
+- Use `assert` and `refute` for exact output lines. Use command exit status for lifecycle checks.
+- Use `psql --set ON_ERROR_STOP=1` when an SQL error must fail the test.
+- Register cleanup before starting a container. Cleanup must work after partial setup and must not hide the original failure.
+
+Tests remove managed containers, but they keep database data in their temporary directories. Temporary `/tmp/mise-db-*-test.*` directories, cache directories, and `tests/tmp/dump.sql` may remain after a run. The shared `mise-db` network may also remain.

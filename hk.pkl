@@ -1,14 +1,14 @@
-amends "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v1.56.0/hk@1.56.0#/Builtins.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Builtins.pkl"
 
 local staticChecks = new Mapping<String, Step> {
     ["syntax"] {
-        glob = "**/*.sh"
+        glob = "{wrappers/postgres,wrappers/redis,**/*.sh}"
         check = "bash -n {{ files }}"
     }
     ["selene"] = Builtins.selene
     ["shellcheck"] {
-        glob = "**/*.sh"
+        glob = "{wrappers/postgres,wrappers/redis,**/*.sh}"
         check = "shellcheck {{ files }}"
     }
     ["stylua"] = Builtins.stylua

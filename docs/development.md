@@ -1,61 +1,82 @@
 # Development
 
-## Setup
+This guide explains the normal workflow for changing mise-db. Read [Architecture](architecture.md) before changing component boundaries and [Code conventions](conventions.md) before writing code.
 
-Install the development tools:
+## Set up the repository
+
+Install the tools declared in `mise.toml`:
 
 ```bash
 mise install
 ```
 
-Link the checkout using the public plugin name:
+Link this checkout as the `mise-db` plugin:
 
 ```bash
-mise plugin link db /path/to/mise-db
+mise plugin link mise-db /path/to/mise-db
 ```
 
-You can then inspect versions or test an install:
+You also need `MISE_DB_ADAPTER` set globally to `docker` or `apple`, with that runtime's service running.
+mise-db does not auto-detect a runtime. When changing adapters, stop services through the old adapter, update the global setting, force-reinstall configured tools, and then start them through the new adapter.
 
-```bash
-mise ls-remote db:postgres
-mise install db:postgres@18.6
-mise exec db:postgres@18.6 -- postgres --version
-```
+## Make a change
 
-Set `GH_TOKEN` if GitHub API rate limits or private-release access require authentication.
+Keep each change in the layer that owns the behavior:
 
-To test an archive before publishing it, put it in a directory using the standard asset name and select that directory:
+- `hooks/` contains mise backend entry points.
+- `lib/` contains shared Lua code and service definitions.
+- `wrappers/` contains installed commands and runtime adapters.
+- `tests/` contains fixtures, helpers, and smoke tests.
 
-```bash
-MISE_DB_ASSET_DIR=/path/to/dist mise install db:postgres@18.6
-```
+Keep shared code independent of a specific service when the behavior is truly common. Put database commands, environment variables, image rules, and readiness behavior in the service implementation.
 
-With this variable set, `mise ls-remote` also discovers versions from archive filenames in that directory.
+Installed wrappers must work without the plugin checkout. Test the copied install layout, not paths into the repository.
+They receive resolved version, image, and name from mise activation rather than an installation manifest.
 
-## Change a published tool version
+## Add a service
 
-Add or update the concrete tool/version object in `ci/tools.json`. Keep the newest patch release for each tracked upstream release line and remove lines that the project no longer supports. Do not add partial versions such as `18`; mise resolves those selectors from the concrete release list. MySQL 26.7 and later use `YY.M.P` calendar versions, which are still recorded as concrete versions.
+Public service names are `postgres`, `redis`, and `mysql`. PostgreSQL and Redis are implemented; MySQL is planned.
 
-Confirm that an upstream version has downloadable source or native binary archives for every target before adding it. Some upstream release-note entries only update container images and cannot be used by this build pipeline.
+To add a service:
 
-Build behavior belongs in `ci/tools/<tool>.sh`. It must support `build`, `package`, `verify`, and `release`, create the standard archive layout, include upstream licenses, verify required executables and linked libraries, and publish both the archive and checksum.
+1. Add its public name to the supported tool list.
+2. Add a Lua service module with its commands, image rules, version discovery, and activation environment.
+3. Add a multi-call wrapper for its server lifecycle and client commands.
+4. Reuse the activation state, instance naming, data directory, and global adapter model.
+5. Extend both runtime adapters where the service needs different behavior.
+6. Add registry fixtures and a smoke test for both adapters.
+7. Add `docs/services/<service>.md` with service-specific behavior and limitations.
 
-Targets belong in `ci/targets.json`. A new Linux target needs a GitHub runner with the matching architecture, a distro container image, dependency setup in `ci/provision/linux.sh`, and corresponding runtime requirements in the README.
+Do not make an adapter helper look generic if it contains service-specific readiness logic. A clear service-specific helper is easier to maintain.
 
-Use the full build workflow for the declared matrix. It skips target assets that already have both an archive and checksum. Use the rebuild workflow to replace one tool/version for a single target or all targets.
+## Verify the change
 
-## Validation
-
-Run static checks after every change:
+Run all format, lint, and syntax checks:
 
 ```bash
 mise run check
 ```
 
-Run the binary smoke tests for changes to hooks, assets, or archive layout:
+Use automatic fixes when needed:
 
 ```bash
-mise run test
+mise run fix
 ```
 
-The smoke tests use local release assets through `MISE_DB_ASSET_DIR`. See [Testing](testing.md) for individual commands.
+Run the smoke test for each affected service:
+
+```bash
+tests/postgres.test.sh
+tests/redis.test.sh
+```
+
+Check the output to confirm that every required adapter ran. The script skips adapters that are not available.
+
+Before finishing:
+
+- verify new errors explain how the user can recover;
+- verify normal wrapper execution does not pull images;
+- verify stop and uninstall behavior does not delete persistent data;
+- update the relevant documentation when behavior changes.
+
+See [Testing](testing.md) for the test harness and test-writing rules.
